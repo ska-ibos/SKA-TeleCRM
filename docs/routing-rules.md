@@ -1,0 +1,35 @@
+# Routing rules (as implemented)
+
+Source: `src/lib/routing/`. Tests: `tests/routing/routing.engine.test.ts` (controlled dates).
+
+## Caller identification
+The caller number is normalised to E.164 and matched against `client_phone_numbers.phone` (unique).
+
+## Sticky agent (keys 3–9)
+- Scope: **per client + department** (unknown callers: per phone number).
+- Qualifying conversation: an **inbound** call for that department that was **answered** by an **active member of that department** (`calls.answered_agent_id` + `answered_at`).
+- The **latest** qualifying conversation wins; validity is `sticky_days` (default **3**) from its `answered_at`.
+- A fresh qualifying conversation therefore resets the expiry automatically — no separate sticky table to drift.
+- The CRM desk answering a department call does **not** create a sticky (not a department member). A CRM-desk **transfer** answered by a department member **does** (sticky learning).
+- Exotel native sticky is never used.
+- No valid sticky → CRM desk.
+
+## Missed-call (key 2)
+Latest `calls` row with `direction = outbound` to the caller's number (or the caller's client) with `initiated_by` set → that agent. No history, agent inactive/busy/offline, or no answer → CRM desk.
+
+## Availability
+`team_members.status`: `available` is dialled; `busy` / `offline` skip straight to the fallback. Dial outcomes `busy` / `no_answer` / `failed` also fall back.
+
+## Fallback chain
+target agent → CRM desk (first *available* member of key-1 department or `is_crm_desk`) → voicemail + callback reminder.
+
+## Invalid input
+`max_reprompts` (default 1) re-prompts, then CRM desk.
+
+## After hours
+Checked at call start in `office_hours.timezone`. Call is marked `after_hours`, state `voicemail`, and an `after_hours` reminder is created for the next opening.
+
+## Idempotency
+- Provider callbacks: `withIdempotency(provider, eventId)`; duplicate `incoming` events with the same provider call id return the existing call.
+- Simulator / outbound / transfer requests carry an `idempotencyKey`.
+- One callback reminder per call.

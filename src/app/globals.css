@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+/*
+ * SKA TeleCRM theme: "Pine & Brass".
+ * All brand decisions live here. Swap these tokens to re-theme the whole app.
+ * The slate scale is overridden with a warm neutral so every existing
+ * slate-* utility stays on theme.
+ */
+@theme {
+  --color-brand-50: #eef7f5;
+  --color-brand-100: #d6ebe6;
+  --color-brand-200: #aed7ce;
+  --color-brand-300: #7ebdb0;
+  --color-brand-400: #4d9e8f;
+  --color-brand-500: #2f8273;
+  --color-brand-600: #1f6a5d;
+  --color-brand-700: #1a564c;
+  --color-brand-800: #16453e;
+  --color-brand-900: #123833;
+  --color-brand-950: #0a211e;
+
+  --color-brass-100: #f6ecd6;
+  --color-brass-200: #eddcb2;
+  --color-brass-300: #e6c98a;
+  --color-brass-400: #d9b05c;
+  --color-brass-500: #c6963a;
+  --color-brass-600: #a67a28;
+
+  /* Chart pair, checked with the palette validator (colourblind separation). */
+  --color-chart-good: #0e8a78;
+  --color-chart-bad: #c2553f;
+
+  --color-slate-50: #f8f8f5;
+  --color-slate-100: #efefea;
+  --color-slate-200: #e3e3dc;
+  --color-slate-300: #cdcdc4;
+  --color-slate-400: #7f7f75;
+  --color-slate-500: #66665e;
+  --color-slate-600: #51514a;
+  --color-slate-700: #3e3e38;
+  --color-slate-800: #2a2a26;
+  --color-slate-900: #1b1b18;
+  --color-slate-950: #10100e;
+
+  --color-ink: #1b1b18;
+  --color-paper: #f5f4ee;
+
+  --font-sans: var(--ff-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--ff-display), Georgia, "Times New Roman", serif;
+  --font-mono: var(--ff-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --shadow-card: 0 1px 2px rgb(18 56 51 / 0.05), 0 10px 24px -18px rgb(18 56 51 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(18 56 51 / 0.06), 0 18px 32px -18px rgb(18 56 51 / 0.32);
+  --shadow-pop: 0 24px 60px -16px rgb(10 33 30 / 0.45);
+
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html, body { background: var(--color-paper); color: var(--color-ink); }
+body { -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; }
+
+input[type="checkbox"], input[type="radio"] { accent-color: var(--color-brand-600); width: 1rem; height: 1rem; }
+button:not(:disabled), [role="button"], summary, select:not(:disabled) { cursor: pointer; }
+
+:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; }
+::selection { background: var(--color-brand-200); color: var(--color-brand-950); }
+
+* { scrollbar-width: thin; scrollbar-color: var(--color-slate-300) transparent; }
+
+@layer components {
+  /* min-w-0: a card in a grid must shrink, so its wide table scrolls instead of the page. */
+  .card { @apply min-w-0 rounded-2xl border border-slate-200/80 bg-white shadow-card; }
+  .card-lift { @apply transition duration-300 ease-soft hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lift; }
+
+  .input {
+    @apply w-full rounded-xl border border-slate-300/90 bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition duration-200
+      placeholder:text-slate-400 hover:border-slate-400/70 focus:border-brand-500 focus:ring-4 focus:ring-brand-100
+      disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
+  }
+  select.input {
+    @apply appearance-none pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2366665e' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.7rem center;
+    background-repeat: no-repeat;
+    background-size: 1.05rem;
+  }
+  .input-error { @apply border-rose-400 hover:border-rose-400 focus:border-rose-500 focus:ring-rose-100; }
+  .label { @apply mb-1.5 block text-xs font-semibold text-slate-600; }
+
+  .table { @apply w-full text-left text-sm; }
+  .table th { @apply whitespace-nowrap border-b border-slate-200 px-5 pb-2.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500; }
+  .table td { @apply border-t border-slate-100 px-5 py-3.5 align-middle; }
+  .table tbody tr:first-child td { @apply border-t-0; }
+  .table tbody tr { @apply transition-colors duration-150 hover:bg-brand-50/60; animation: fade-in 0.45s ease backwards; }
+  /* Lets a table run edge to edge inside a padded card. */
+  .table-bleed { @apply -mx-5 overflow-x-auto; }
+  .table-compact th, .table-compact td { @apply px-2.5; }
+  .table-compact th:first-child, .table-compact td:first-child { @apply pl-5; }
+  .table-compact th:last-child, .table-compact td:last-child { @apply pr-5; }
+
+  .link { @apply font-medium text-brand-600 underline-offset-2 transition-colors hover:text-brand-800 hover:underline; }
+}
+
+/* ---------------- surfaces ---------------- */
+.bg-dots {
+  background-image: radial-gradient(rgb(255 255 255 / 0.09) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.bg-dots-ink {
+  background-image: radial-gradient(rgb(18 56 51 / 0.09) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.bg-hazard {
+  background-image: repeating-linear-gradient(135deg, var(--color-brass-100) 0 12px, #fbf5e6 12px 24px);
+}
+
+/* ---------------- motion ----------------
+ * Fill mode is always "backwards": once an animation ends it leaves no transform
+ * or stacking context behind, so sticky headers and z-index keep working.
+ */
+@keyframes fade-in { from { opacity: 0 } }
+@keyframes rise { from { opacity: 0; transform: translateY(10px) } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(0.97) } }
+@keyframes slide-in-right { from { opacity: 0; transform: translateX(28px) } }
+@keyframes grow-x { from { transform: scaleX(0) } }
+@keyframes grow-y { from { transform: scaleY(0) } }
+@keyframes shimmer { to { background-position: -200% 0 } }
+@keyframes ring { 0%,100% { transform: rotate(0) } 20% { transform: rotate(-12deg) } 40% { transform: rotate(12deg) } 60% { transform: rotate(-8deg) } 80% { transform: rotate(8deg) } }
+@keyframes ping-soft { 0% { transform: scale(1); opacity: 0.55 } 80%, 100% { transform: scale(2.4); opacity: 0 } }
+@keyframes route-pulse { 0% { stroke-dashoffset: 100; opacity: 0 } 2% { opacity: 1 } 11% { opacity: 1 } 13%, 100% { stroke-dashoffset: 0; opacity: 0 } }
+@keyframes float-soft { 50% { transform: translateY(-6px) } }
+@keyframes shake { 20%, 60% { transform: translateX(-5px) } 40%, 80% { transform: translateX(5px) } }
+
+.page-enter { animation: rise 0.45s var(--ease-soft) backwards; }
+.fade-in { animation: fade-in 0.3s ease backwards; }
+.pop-in { animation: pop-in 0.28s var(--ease-soft) backwards; }
+.slide-in-right { animation: slide-in-right 0.4s var(--ease-soft) backwards; }
+.shake { animation: shake 0.4s ease; }
+.animate-ring { animation: ring 1s ease-in-out infinite; }
+.animate-float { animation: float-soft 6s ease-in-out infinite; }
+
+.stagger > * { animation: rise 0.5s var(--ease-soft) backwards; animation-delay: 0.42s; }
+.stagger > *:nth-child(1) { animation-delay: 0.03s; }
+.stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger > *:nth-child(3) { animation-delay: 0.13s; }
+.stagger > *:nth-child(4) { animation-delay: 0.18s; }
+.stagger > *:nth-child(5) { animation-delay: 0.23s; }
+.stagger > *:nth-child(6) { animation-delay: 0.28s; }
+.stagger > *:nth-child(7) { animation-delay: 0.33s; }
+.stagger > *:nth-child(8) { animation-delay: 0.38s; }
+
+.bar-x { transform-origin: left; animation: grow-x 0.8s var(--ease-soft) backwards; }
+.bar-y { transform-origin: bottom; animation: grow-y 0.7s var(--ease-soft) backwards; }
+
+.skeleton {
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, var(--color-slate-100) 25%, var(--color-slate-50) 50%, var(--color-slate-100) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.ping-dot { animation: ping-soft 1.8s var(--ease-soft) infinite; }
+
+/* Paginated rows / items: rise in with a short stagger. Set style={{ "--i": index }} on each row.
+   The delay is capped at 14 steps so long pages still settle within ~0.6s. Re-runs on page
+   change because the list is keyed by page. */
+/* Dashboard hero: the first name arrives just after the greeting; background glow drifts slowly. */
+@keyframes name-in { from { opacity: 0; transform: translateY(6px); filter: blur(4px) } }
+.name-in { animation: name-in 0.6s var(--ease-soft) 0.25s backwards; }
+@keyframes drift { 0%, 100% { transform: translate(0, 0) scale(1) } 50% { transform: translate(-24px, 18px) scale(1.08) } }
+.hero-glow { animation: drift 12s ease-in-out infinite; }
+
+.row-enter { animation: rise 0.38s var(--ease-soft) backwards; animation-delay: calc(min(var(--i, 0), 14) * 22ms); }
+
+/* Login: signal travelling along the routing diagram. */
+.route-pulse { stroke-dasharray: 14 86; stroke-dashoffset: 100; opacity: 0; animation: route-pulse 6s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .skeleton { animation: none; }
+  .route-pulse { opacity: 0; }
+}

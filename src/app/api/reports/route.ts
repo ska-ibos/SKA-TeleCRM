@@ -1,0 +1,18 @@
+import { api, ok } from "@/lib/utils/response";
+import { apiCtx, param } from "@/lib/api/context";
+import { buildReport } from "@/lib/services/report.service";
+import { toCsv } from "@/lib/utils/csv";
+import { dateRangeSchema } from "@/lib/validations";
+
+export const GET = api(async (req) => {
+  const { store } = await apiCtx("reports:read");
+  const r = await buildReport(store, dateRangeSchema.parse({ from: param(req, "from"), to: param(req, "to") }));
+  const format = param(req, "format");
+  if (format) {
+    const key = format === "agents" ? "byAgent" : format === "departments" ? "byDepartment" : null;
+    const csv = key ? toCsv(r[key]) : toCsv(r.calls, ["started_at", "direction", "from_number", "client_name", "status", "ivr_input", "department_name", "agent_name", "route_reason", "duration_sec"]);
+    return new Response(csv, { headers: { "content-type": "text/csv", "content-disposition": `attachment; filename=report-${format}.csv` } });
+  }
+  // buildReport reads at most 2,000 calls; tell the UI when the totals may be cut short
+  return ok({ ...r, calls: r.calls.slice(0, 50), truncated: r.calls.length >= 2000 });
+});
