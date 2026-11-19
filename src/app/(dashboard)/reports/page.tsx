@@ -114,6 +114,11 @@ export default function ReportsPage() {
             <StatCard label="Missed / voicemail" value={t.missed} hint={`${t.afterHours} after hours`} icon={PhoneMissed} accent="rose" />
             <StatCard label="Avg talk time" value={fmtDuration(t.avgDurationSec)} hint={`${t.stickyRouted} sticky · ${t.missedCallRouted} missed-call routed`} icon={Timer} accent="amber" />
           </div>
+          <div className="stagger mt-4 grid gap-4 sm:grid-cols-3">
+            <StatCard label="Sticky-hit rate" value={t.stickyHitRate} suffix="%" hint={`of ${t.departmentPresses} department key presses had a recent agent`} icon={Repeat} accent="green" />
+            <StatCard label="Voicemails" value={t.voicemails} hint="callers who left a message" icon={PhoneMissed} accent="rose" />
+            <StatCard label="After-hours calls" value={t.afterHours} hint="outside office hours" icon={Timer} accent="amber" />
+          </div>
           <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
             <Card title="By agent" actions={<Legend />}><Breakdown rows={q.data!.byAgent} /></Card>
             <Card title="By department" actions={<Legend />}><Breakdown rows={q.data!.byDepartment} /></Card>

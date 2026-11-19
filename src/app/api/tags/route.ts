@@ -4,6 +4,7 @@ import { clientTagSchema, tagSchema, uuid } from "@/lib/validations";
 import { notFound } from "@/lib/data/types";
 import { audit } from "@/lib/services/audit.service";
 import type { ClientTag, Tag } from "@/types";
+import { canSeeClient, scopeFor } from "@/lib/services/access.service";
 
 export const GET = api(async () => {
   const { store } = await apiCtx();
@@ -16,7 +17,7 @@ export const POST = api(async (req) => {
   const body = (await readJson(req)) as Record<string, unknown>;
   if ("tag_id" in body) {
     const input = clientTagSchema.parse(body);
-    if (!(await store.get("clients", input.client_id))) throw notFound("Client");
+    if (!canSeeClient(await scopeFor(store, user), input.client_id) || !(await store.get("clients", input.client_id))) throw notFound("Client");
     if (!(await store.get("tags", input.tag_id))) throw notFound("Tag");
     const [dup] = await store.list<ClientTag>("client_tags", { eq: input });
     return ok(dup ?? (await store.insert("client_tags", input)), 201);

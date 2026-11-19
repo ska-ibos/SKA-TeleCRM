@@ -33,6 +33,7 @@ export default function ExtensionsPage() {
   return (
     <>
       <PageHeader title="Extensions" subtitle="Give each agent a direct number that callers can dial at the greeting." />
+      {!admin && <p className="mb-4 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">Only TeleCRM admins can change extensions.</p>}
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           {q.error ? <ErrorBox message={q.error} onRetry={q.reload} /> : q.loading ? <Loading rows={6} /> : (

@@ -5,7 +5,8 @@ import { updateSession } from "./lib/supabase/middleware";
  * Next.js 16 "proxy" (formerly middleware): refreshes the Supabase session and
  * redirects anonymous users to /login. Fine-grained role checks happen in API routes.
  */
-const PUBLIC = ["/login", "/api/auth/demo", "/api/auth/login", "/api/auth/config", "/api/exotel"];
+// Exotel webhooks (?token=) and scheduled jobs (Bearer CRON_SECRET) authenticate themselves
+const PUBLIC = ["/login", "/api/auth/demo", "/api/auth/login", "/api/auth/config", "/api/exotel/", "/api/cron/", "/api/reminders/dispatch"];
 
 export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;

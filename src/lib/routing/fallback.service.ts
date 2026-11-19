@@ -4,9 +4,12 @@ import { getCrmDeskMembers } from "./department.service";
 import { nextOfficeOpening } from "../utils/date";
 import type { OfficeHours } from "../constants";
 
-/** First available CRM desk member, or null when the whole desk is busy/offline. */
-export async function pickCrmDesk(store: Store, exclude: string[] = []): Promise<TeamMember | null> {
-  const desk = (await getCrmDeskMembers(store)).filter((m) => !exclude.includes(m.id));
+/**
+ * First available CRM desk member, or null when the whole desk is busy/offline.
+ * `requirePhone`: live telephony rings mobiles, so a desk member without a number cannot take the call.
+ */
+export async function pickCrmDesk(store: Store, exclude: string[] = [], opts: { requirePhone?: boolean } = {}): Promise<TeamMember | null> {
+  const desk = (await getCrmDeskMembers(store)).filter((m) => !exclude.includes(m.id) && (!opts.requirePhone || m.phone));
   return desk.find((m) => m.status === "available") ?? null;
 }
 

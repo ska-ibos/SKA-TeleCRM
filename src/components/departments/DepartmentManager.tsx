@@ -37,6 +37,7 @@ export function DepartmentManager() {
   if (q.loading) return <Loading rows={6} />;
   return (
     <>
+      {!can("departments:write") && <p className="mb-4 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">Only TeleCRM admins can rename departments or change who belongs to them. A member's departments can also be set on the Team page.</p>}
       <div className="stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {q.data?.map((d) => (
           <Card key={d.id} className="card-lift" title={<span className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-900 font-display text-lg font-medium text-brass-300">{d.ivr_key}</span><span className="text-[15px]">{d.name}</span></span>}

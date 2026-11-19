@@ -119,3 +119,23 @@ export async function listDepartments(store: Store) {
       .map((m) => ({ id: m.id, full_name: m.full_name, status: m.status })),
   }));
 }
+
+/**
+ * Delete a team member - only one with no history (added by mistake). Anyone who has calls,
+ * notes, reminders or transfers is deactivated instead, so past records keep their name.
+ */
+export async function deleteMember(store: Store, id: string, actorId: string | null) {
+  const m = await store.get<TeamMember>("team_members", id);
+  if (!m) throw notFound("Team member");
+  if (id === actorId) throw conflict("You cannot delete yourself");
+  const has = async (table: "calls" | "notes" | "reminders" | "call_transfers", cols: string[]) => {
+    for (const c of cols) if ((await store.list(table, { eq: { [c]: id }, limit: 1 })).length) return true;
+    return false;
+  };
+  if (await has("calls", ["answered_agent_id", "routed_agent_id", "initiated_by"]) || await has("notes", ["author_id"])
+    || await has("reminders", ["assigned_to", "created_by"]) || await has("call_transfers", ["from_member_id", "to_member_id"])) {
+    throw conflict(`${m.full_name} has call history, notes or reminders. Deactivate them instead - they will not be rung or able to sign in, and their history stays.`);
+  }
+  await store.remove("team_members", id); // department links go with it
+  await audit(store, actorId, "delete", "team_member", id, { name: m.full_name });
+}

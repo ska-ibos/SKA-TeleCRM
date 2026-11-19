@@ -36,7 +36,9 @@ export async function updateReminder(store: Store, input: z.infer<typeof reminde
   if (!r) throw notFound("Reminder");
   const staff = ["admin", "crm_desk", "manager"].includes(user.role);
   if (!staff && r.assigned_to !== user.memberId && r.created_by !== user.memberId) throw forbidden("You can only update your own reminders");
-  const { id, ...patch } = input;
+  const { id, ...fields } = input;
+  // rescheduled: notify again at the new time
+  const patch = fields.due_at && fields.due_at !== r.due_at ? { ...fields, notified_at: null, notify_error: null } : fields;
   const updated = await store.update<Reminder>("reminders", id, patch);
   await audit(store, user.memberId, "update", "reminder", id, patch);
   return updated;

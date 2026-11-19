@@ -8,7 +8,7 @@ Ground rules (applied 2026-11-04):
 - **SKA OS data is read-only for TeleCRM.** `clients`, `client_contacts` and `employees` are read through views. FKs into SKA OS tables use only `ON DELETE SET NULL` / `CASCADE`, so TeleCRM can never block SKA OS from deleting a client, employee or user.
 - **Tenant-scoped.** Every row has `tenant_id`. `tc_` → `tc_` references are composite `(tenant_id, id)` FKs, so a row can't point at another workspace's data. Rows that point at `public.clients` are checked by a trigger.
 
-Migrations: `supabase/migrations/2026110400000{1,2,3}_telecrm_*.sql` (applied as `telecrm_01_core`, `telecrm_02_views_security`, `telecrm_03_seed`).
+Migrations: `supabase/migrations/2026110400000{1,2,3}_telecrm_*.sql` (applied as `telecrm_01_core`, `telecrm_02_views_security`, `telecrm_03_seed`) and `20261119000001_telecrm_live_features.sql` (applied 2026-11-19 as `telecrm_04_live_features`: routing keys `dept_miss_behavior`, `missed_call_window_days`, `parallel_ring_max`, the private `telecrm-recordings` Storage bucket, and `notify_via` / `notified_at` / `notify_error` on `tc_reminders` for WhatsApp reminders).
 Verification: `supabase/tests/rls.test.sql` (dry run that always rolls back).
 
 ## Tables (TeleCRM-owned)
@@ -68,7 +68,10 @@ Supabase advisor: "RLS enabled, no policy" on 15 tables is intentional (server-o
 
 | | admin | crm_desk | manager | agent |
 |---|---|---|---|---|
-| Read CRM data | ✓ | ✓ | ✓ | ✓ |
+| View clients (list, client page with full history) | all | all | all | all |
+| Call history list | all | all | own + their departments' calls | own calls |
+| Hear recordings | ✓ | own calls | their departments' calls | own calls |
+| Link an unknown caller to a client | ✓ | ✓ | ✓ | – |
 | Add caller-ID numbers / tags | ✓ | ✓ | ✓ | – |
 | Create / edit / delete clients | in SKA OS only | | | |
 | Team, departments, extensions, settings | ✓ | – | – | – |

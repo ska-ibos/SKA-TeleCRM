@@ -34,7 +34,8 @@ function istAt(weekday: number, hh: number, mm = 0) {
 export function CallSimulator() {
   const toast = useToast();
   const { user, can } = useUser();
-  const clients = useApi<ClientRow[]>("/api/clients");
+  // all client numbers for testing caller ID, whatever the tester's role (see /api/simulator?callers=1)
+  const clients = useApi<Pick<ClientRow, "id" | "name" | "phones">[]>("/api/simulator?callers=1");
   const team = useApi<MemberRow[]>("/api/team");
   const depts = useApi<Department[]>("/api/departments");
   const sim = useApi<{ calls: EnrichedCall[]; log: string[] }>("/api/simulator");

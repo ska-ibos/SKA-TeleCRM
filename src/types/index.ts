@@ -42,7 +42,7 @@ export type SessionState = "greeting" | "sticky_offer" | "dialing" | "connected"
 export interface CallSession {
   id: string; call_id: string; state: SessionState; attempts: number;
   offered_agent_id: string | null; target_agent_id: string | null;
-  context: { fallback?: "crm" | "voicemail"; trail?: string[]; transferId?: string; departmentId?: string | null; candidateClientIds?: string[] };
+  context: { fallback?: "crm" | "voicemail"; pool?: "crm" | "department"; poolDept?: string | null; tried?: string[]; trail?: string[]; transferId?: string; departmentId?: string | null; candidateClientIds?: string[] };
   /** Optimistic lock, bumped on every update. */
   version: number;
   created_at: string; updated_at: string;
@@ -58,6 +58,8 @@ export interface Reminder {
   id: string; client_id: string | null; call_id: string | null; assigned_to: string | null; created_by: string | null;
   title: string; due_at: string; status: "pending" | "done" | "cancelled";
   source: "manual" | "after_hours" | "voicemail" | "missed"; created_at: string;
+  /** WhatsApp delivery (migration 20261119000001). Missing = "both". */
+  notify_via?: "in_app" | "whatsapp" | "both"; notified_at?: string | null; notify_error?: string | null;
 }
 export interface AuditLog { id: string; actor_id: string | null; action: string; entity: string; entity_id: string | null; details: Record<string, unknown>; created_at: string }
 export interface RoutingConfigRow { key: string; value: unknown; id?: string }
@@ -66,6 +68,10 @@ export interface SessionUser {
   id: string; name: string; email: string | null; role: AppRole; memberId: string | null; mode: "demo" | "supabase";
   /** True when clients live in SKA OS (Supabase mode): no create/edit/delete in TeleCRM. */
   clientsManagedExternally?: boolean;
+  /** True when TELEPHONY_PROVIDER=exotel: calls are real, no simulated outcomes in the UI. */
+  liveTelephony?: boolean;
+  /** True when WhatsApp reminders (SendBuddy) are set up on the server. */
+  whatsapp?: boolean;
 }
 
 /** Result of every routing step: what the IVR/telephony layer must do next. */

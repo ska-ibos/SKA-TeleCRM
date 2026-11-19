@@ -2,7 +2,13 @@
 
 Scope: **Operations line only.** No Sales number, IVR, queue or workflow exists in this project.
 
-## Greeting (editable in Settings)
+## Prompts (editable in Settings)
+
+The defaults are the spec's Hinglish wording (greeting, sticky offer "GST ke liye aapki pichhli baat Hiren se hui thi…", connecting, voicemail, after hours). The live database keeps the prompts saved there, so update them in **Settings → IVR prompts** to switch an existing setup to Hinglish.
+
+## Greeting
+
+On live calls the greeting is preceded by **"Namaste {name} ji."** for recognised clients and the **recording notice** (both editable in Settings; leave empty to skip).
 
 > Welcome to Single Key Advisory. Enter the extension number, or press 1 for CRM desk, 2 if you missed our call, 3 for FA 360, 4 for Internal Audit, 5 for MIS, 6 for GST, 7 for Income Tax, 8 for Accounting, 9 for ROC.
 
@@ -10,7 +16,7 @@ Scope: **Operations line only.** No Sales number, IVR, queue or workflow exists 
 
 | Input | Department | Behaviour |
 |---|---|---|
-| 2–6 digits | Extension | Ring the mapped agent → CRM desk on busy/no-answer. Unknown extension = invalid input |
+| 2–6 digits + `#` | Extension | Ring the mapped agent → CRM desk on busy/no-answer. Unknown extension = invalid input. Single keys need no `#` (the menu waits ~4 s after the last key) |
 | 1 | CRM Desk | Jinofer (CRM queue) |
 | 2 | Missed-call callback | Most recent outbound agent for this caller → CRM desk |
 | 3 | FA 360 | Urja, Jenish, Prassana — sticky lookup |

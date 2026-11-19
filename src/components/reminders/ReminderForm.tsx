@@ -15,6 +15,7 @@ export function ReminderForm({ open, onClose, clientId, callId, onSaved }: { ope
   const team = useApi<TeamMember[]>(open ? "/api/team" : null);
   const [title, setTitle] = useState(""), [due, setDue] = useState(localInput(new Date(Date.now() + 3600_000)));
   const [assignee, setAssignee] = useState(user.memberId ?? "");
+  const [notify, setNotify] = useState<"both" | "in_app" | "whatsapp">("both");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
@@ -22,7 +23,7 @@ export function ReminderForm({ open, onClose, clientId, callId, onSaved }: { ope
 
   async function save() {
     const dueDate = new Date(due);
-    const body = { title, due_at: Number.isNaN(dueDate.getTime()) ? "" : dueDate.toISOString(), client_id: clientId ?? null, call_id: callId ?? null, assigned_to: assignee || null };
+    const body = { title, due_at: Number.isNaN(dueDate.getTime()) ? "" : dueDate.toISOString(), client_id: clientId ?? null, call_id: callId ?? null, assigned_to: assignee || null, ...(notify !== "both" && { notify_via: notify }) };
     const r = reminderSchema.safeParse(body);
     const errs: Record<string, string> = r.success ? {} : zodErrors(r.error);
     if (!due) errs.due_at = "Choose when the reminder is due";
@@ -52,6 +53,12 @@ export function ReminderForm({ open, onClose, clientId, callId, onSaved }: { ope
         <Field label="Assign to" error={errors.assigned_to}>
           <Select value={assignee} onChange={setAssignee} options={assignees} aria-label="Assign to" searchPlaceholder="Search team…" />
         </Field>
+        {user.whatsapp && (
+          <Field label="Notify" hint="WhatsApp goes to the assignee's mobile (Team page) when the reminder is due">
+            <Select value={notify} onChange={(v) => setNotify(v as typeof notify)} aria-label="Notify"
+              options={[{ value: "both", label: "In the app and on WhatsApp" }, { value: "in_app", label: "In the app only" }, { value: "whatsapp", label: "WhatsApp only" }]} />
+          </Field>
+        )}
       </div>
     </Modal>
   );

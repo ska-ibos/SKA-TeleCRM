@@ -2,7 +2,7 @@
 
 Operations CRM with a smart call-routing engine: Operations IVR, extensions, CRM desk, missed-call callback, per-department sticky agents (3-day), after-hours voicemail, transfers, reminders, reports and audit. **Operations only — no Sales features.**
 
-Telephony runs in **simulation mode** (no real phone calls) until Exotel credentials and official API details are provided.
+Telephony runs in **simulation mode** by default. Set `TELEPHONY_PROVIDER=exotel` plus the Exotel variables for real calls — see [docs/exotel-integration.md](docs/exotel-integration.md) for the server settings and the call flow to build in Exotel.
 
 ## Quick start
 
@@ -45,6 +45,7 @@ Next.js 16 (App Router, `src/proxy.ts`), React 19, TypeScript, Tailwind CSS 4, S
 - [Routing rules](docs/routing-rules.md)
 - [Database schema](docs/database-schema.md)
 - [Exotel integration](docs/exotel-integration.md)
+- [WhatsApp reminders (SendBuddy)](docs/whatsapp-reminders.md)
 - [Setup guide](docs/setup-guide.md)
 
 ## Roles

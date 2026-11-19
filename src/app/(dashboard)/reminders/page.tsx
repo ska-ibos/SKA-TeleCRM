@@ -55,6 +55,8 @@ export default function RemindersPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {r.source !== "manual" && <Badge tone="amber">{r.source.replace("_", " ")}</Badge>}
+                    {r.notified_at && !r.notify_error && <Badge tone="green" className="whitespace-nowrap">WhatsApp sent</Badge>}
+                    {r.notify_error && <span title={r.notify_error}><Badge tone="red" className="whitespace-nowrap">{r.notified_at ? "Not sent" : "WhatsApp retrying"}</Badge></span>}
                     <Badge tone={statusTone(r.status)}>{r.status}</Badge>
                     {r.status === "pending" && <>
                       <Button size="sm" variant="success" onClick={() => update(r.id, "done")}><Check className="h-3 w-3" />Done</Button>
