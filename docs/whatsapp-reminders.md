@@ -60,5 +60,5 @@ to `vercel.json`.) To stop it: `select cron.unschedule('tc-dispatch-reminders');
 - Only reminders due in the last 24 h are sent, so a long outage does not flood anyone.
 - Rescheduling a reminder sends it again at the new time.
 
-Needs migration `20261119000001_telecrm_live_features.sql` (adds `notify_via`, `notified_at`,
+Uses migration `20261119000001_telecrm_live_features.sql`, applied to the shared database as `telecrm_04_live_features` (adds `notify_via`, `notified_at`,
 `notify_error` to `tc_reminders`).
