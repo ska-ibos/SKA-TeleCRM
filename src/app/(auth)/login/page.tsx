@@ -17,7 +17,7 @@ function LoginInner() {
   const next = useSearchParams().get("next");
   const dest = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
   const reason = useSearchParams().get("reason");
-  const [mode, setMode] = useState<{ mode: "supabase" | "demo" | "misconfigured"; missing: string[] } | null>(null);
+  const [mode, setMode] = useState<{ mode: "supabase" | "demo" | "misconfigured"; missing: string[]; problem?: string } | null>(null);
   const [identifier, setIdentifier] = useState(""), [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -122,7 +122,9 @@ function LoginInner() {
 
             {!mode ? <div className="space-y-3"><Skeleton className="h-11 rounded-xl" /><Skeleton className="h-11 rounded-xl" /></div>
             : mode.mode === "misconfigured" ? (
-              <ErrorBox message={`Sign-in is unavailable: the server is missing ${mode.missing.join(", ")}. Add it to the server environment (.env) and restart.`} />
+              <ErrorBox message={mode.missing.length
+                ? `Sign-in is unavailable: the server is missing ${mode.missing.join(", ")}. Add it to the server environment (.env) and restart.`
+                : `Sign-in is unavailable: ${mode.problem}. Copy all three values from the same project (Supabase → Project Settings → API Keys) into .env and restart.`} />
             ) : mode.mode === "supabase" ? (
               <form onSubmit={passwordLogin} className="space-y-4" noValidate>
                 <Field label="Username or email" error={errors.identifier} required>
