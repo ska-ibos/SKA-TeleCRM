@@ -115,6 +115,8 @@ export const reminderSchema = z.object({
   client_id: uuid.optional().nullable(),
   call_id: uuid.optional().nullable(),
   assigned_to: uuid.optional().nullable(),
+  /** omitted = the database default ("both": in the app, and on WhatsApp when it is set up) */
+  notify_via: z.enum(["in_app", "whatsapp", "both"]).optional(),
 });
 export const reminderUpdateSchema = z.object({
   id: uuid, status: z.enum(["pending", "done", "cancelled"]).optional(),

@@ -130,6 +130,7 @@ agent on the call, the CRM desk, a manager or an admin can record it.
 ## 7. Maintenance job (`vercel.json` cron → `/api/cron/maintenance`)
 
 Needs `CRON_SECRET` (Vercel sends it as `Authorization: Bearer …`). Each run:
+- **WhatsApp reminders** that are due (see [whatsapp-reminders.md](whatsapp-reminders.md) for the 5-minute schedule).
 - **Callers who hang up during the menu** — Exotel calls none of our URLs, so the job asks
   Exotel's Call Details API about inbound calls still open after 15 min and closes them
   (missed + callback reminder, or completed if they were connected), saving the recording link.
@@ -143,6 +144,4 @@ Needs `CRON_SECRET` (Vercel sends it as `Authorization: Bearer …`). Each run:
 
 ## 8. Not covered yet
 
-- **WhatsApp reminders (SendBuddy)** — needs SendBuddy's API details. Reminders are shown
-  in-app (bell in the header, Reminders page) until then.
 - **Sales line** (second ExoPhone) — Phase 4 of the spec.

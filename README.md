@@ -45,6 +45,7 @@ Next.js 16 (App Router, `src/proxy.ts`), React 19, TypeScript, Tailwind CSS 4, S
 - [Routing rules](docs/routing-rules.md)
 - [Database schema](docs/database-schema.md)
 - [Exotel integration](docs/exotel-integration.md)
+- [WhatsApp reminders (SendBuddy)](docs/whatsapp-reminders.md)
 - [Setup guide](docs/setup-guide.md)
 
 ## Roles

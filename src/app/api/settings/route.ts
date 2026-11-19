@@ -7,6 +7,7 @@ import { audit, listAudit } from "@/lib/services/audit.service";
 import { can } from "@/lib/auth/permissions";
 import { getProvider } from "@/lib/telephony/provider.factory";
 import { isSupabaseConfigured } from "@/lib/data/store";
+import { whatsappEnabled } from "@/lib/notify/whatsapp";
 
 export const GET = api(async () => {
   const { store, user } = await apiCtx();
@@ -17,6 +18,7 @@ export const GET = api(async () => {
     system: {
       dataMode: isSupabaseConfigured() ? "supabase" : "demo (in-memory)",
       telephony: provider.name, telephonyConfigured: provider.isConfigured(),
+      whatsapp: whatsappEnabled(),
     },
   });
 });

@@ -22,7 +22,7 @@ import type { RoutingConfig } from "@/lib/constants";
 import type { AuditLog } from "@/types";
 
 type AuditRow = AuditLog & { actor_name: string };
-type Data = { config: RoutingConfig; audit: AuditRow[]; system: { dataMode: string; telephony: string; telephonyConfigured: boolean } };
+type Data = { config: RoutingConfig; audit: AuditRow[]; system: { dataMode: string; telephony: string; telephonyConfigured: boolean; whatsapp: boolean } };
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function SettingsPage() {
@@ -63,6 +63,10 @@ export default function SettingsPage() {
             <div className="flex justify-between"><dt className="text-slate-500">Telephony</dt><dd><Badge tone="indigo">{q.data.system.telephony}</Badge></dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Exotel credentials</dt><dd><Badge tone={q.data.system.telephonyConfigured && q.data.system.telephony === "exotel" ? "green" : "slate"}>{q.data.system.telephony === "exotel" && q.data.system.telephonyConfigured ? "configured" : "not configured"}</Badge></dd></div>
           </dl>
+          <dl className="mt-3 space-y-3 text-sm">
+            <div className="flex justify-between"><dt className="text-slate-500">WhatsApp reminders</dt><dd><Badge tone={q.data.system.whatsapp ? "green" : "slate"}>{q.data.system.whatsapp ? "SendBuddy connected" : "not configured"}</Badge></dd></div>
+          </dl>
+          {admin && q.data.system.whatsapp && <WhatsAppTest />}
           <p className="mt-3 text-xs text-slate-500">Exotel native sticky is never used — sticky routing is computed by the CRM.</p>
         </Card>
 
@@ -126,6 +130,25 @@ function AuditTable({ rows }: { rows: AuditRow[] }) {
         </tbody>
       </table>
       <Pagination p={pg} noun="entries" />
+    </div>
+  );
+}
+
+/** Send a test WhatsApp through SendBuddy (to the admin's own mobile, or another number). */
+function WhatsAppTest() {
+  const toast = useToast();
+  const [to, setTo] = useState(""), [busy, setBusy] = useState(false);
+  async function send() {
+    setBusy(true);
+    try {
+      const r = await apiFetch<{ to: string }>("/api/whatsapp/test", { body: to.trim() ? { to } : {} });
+      toast.success(`Test message sent to ${r.to}`);
+    } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
+  return (
+    <div className="mt-3 flex gap-2">
+      <input className="input" placeholder="Your mobile (blank = yours on Team)" value={to} maxLength={20} onChange={(e) => setTo(e.target.value)} aria-label="Test WhatsApp number" />
+      <Button size="sm" variant="secondary" loading={busy} onClick={send}>Test</Button>
     </div>
   );
 }

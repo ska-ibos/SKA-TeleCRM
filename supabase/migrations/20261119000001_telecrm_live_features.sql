@@ -5,6 +5,7 @@
 --   1. routing config keys: dept_miss_behavior, missed_call_window_days,
 --      parallel_ring_max (existing keys keep their rules)
 --   2. private Storage bucket for archived call recordings
+--   3. WhatsApp reminder delivery columns on tc_reminders (spec §4.11, §8.5)
 -- Idempotent: safe to run more than once.
 -- =====================================================================
 
@@ -41,3 +42,23 @@ values ('telecrm-recordings', 'telecrm-recordings', false, 52428800,
 on conflict (id) do nothing;
 -- No storage policies are added: only the service role (the TeleCRM server, after its
 -- own role checks) reads or writes this bucket.
+
+-- 3. WhatsApp reminders ---------------------------------------------------
+alter table public.tc_reminders
+  add column if not exists notify_via   text not null default 'both',
+  add column if not exists notified_at  timestamptz,
+  add column if not exists notify_error text;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'tc_reminders_notify_via_check') then
+    alter table public.tc_reminders add constraint tc_reminders_notify_via_check
+      check (notify_via in ('in_app', 'whatsapp', 'both'));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'tc_reminders_notify_error_len') then
+    alter table public.tc_reminders add constraint tc_reminders_notify_error_len
+      check (notify_error is null or length(notify_error) <= 500);
+  end if;
+end $$;
+-- due, not yet sent: what the dispatcher scans every few minutes
+create index if not exists tc_reminders_dispatch_idx on public.tc_reminders (tenant_id, due_at)
+  where status = 'pending' and notified_at is null;
