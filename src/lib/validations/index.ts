@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { normalizePhone } from "../utils/phone";
 import { isoRangeIssues } from "../utils/date-range";
-import { DEFAULT_CONNECTING_PROMPT } from "../constants";
+import { DEFAULT_CONNECTING_PROMPT, DEFAULT_KNOWN_CALLER_PROMPT, DEFAULT_RECORDING_NOTICE } from "../constants";
 
 const trimmed = (min: number, max: number, label: string) =>
   z.string({ error: `${label} is required` }).trim()
@@ -64,6 +64,22 @@ export const teamMemberSchema = z.object({
   is_crm_desk: z.boolean().default(false),
   is_active: z.boolean().default(true),
 });
+/**
+ * PATCH body: only the keys that are sent change. Built without defaults on purpose -
+ * `teamMemberSchema.partial()` would still fill `status: "offline"`, `is_active: true`, ...
+ * and silently reset (or re-activate) the member.
+ */
+export const teamMemberPatchSchema = z.object({
+  employee_id: uuid.nullish(),
+  full_name: safeName("Full name").max(80).optional(),
+  email: z.string().trim().toLowerCase().max(254).email("Enter a valid email address").nullable().optional()
+    .or(z.literal("").transform(() => null)),
+  phone: z.union([phoneSchema, z.literal("").transform(() => null), z.null()]).optional(),
+  role: z.enum(["admin", "crm_desk", "manager", "agent"]).optional(),
+  status: z.enum(["available", "busy", "offline"]).optional(),
+  is_crm_desk: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+});
 /** Optional on team create/update: the member's departments (IVR keys 3-9). Omitted = unchanged. */
 export const memberDepartmentsSchema = z.object({
   department_ids: z.array(uuid).max(20, "At most 20 departments")
@@ -123,6 +139,10 @@ export const routingConfigSchema = z.object({
       .refine((v) => v.includes("{extension}"), "Include {extension} so the caller hears the number")
       .refine((v) => !/\{(?!name\}|extension\})[^}]*\}/.test(v), "Only {name} and {extension} can be used")
       .default(DEFAULT_CONNECTING_PROMPT),
+    known_caller: z.string().trim().max(200, "Must be at most 200 characters")
+      .refine((v) => !/\{(?!name\})[^}]*\}/.test(v), "Only {name} can be used")
+      .default(DEFAULT_KNOWN_CALLER_PROMPT),
+    recording_notice: z.string().trim().max(300, "Must be at most 300 characters").default(DEFAULT_RECORDING_NOTICE),
   }),
 });
 
@@ -153,15 +173,6 @@ export const transferSchema = z.object({
   call_id: uuid, to_member_id: uuid, department_id: uuid.optional().nullable(),
   result: z.enum(["answered", "busy", "no_answer", "failed"]).optional(), at, idempotencyKey: z.string().min(8).max(100),
 });
-/** Provider-neutral webhook payload; the Exotel adapter maps official fields into this shape. */
-export const telephonyEventSchema = z.object({
-  eventId: z.string().min(1).max(200),
-  type: z.enum(["incoming", "input", "sticky", "dial_result", "voicemail", "hangup"]),
-  providerCallId: z.string().min(1).max(200),
-  from: z.string().optional(), digits: z.string().max(10).optional(),
-  result: z.enum(["answered", "busy", "no_answer", "failed"]).optional(),
-});
-
 /** SKA OS accounts sign in with a username (3-20 chars: letters, numbers, . _) or their email. */
 export const loginSchema = z.object({
   identifier: z.string().trim().min(1, "Enter your username or email").max(254)

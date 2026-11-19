@@ -66,6 +66,8 @@ export interface SessionUser {
   id: string; name: string; email: string | null; role: AppRole; memberId: string | null; mode: "demo" | "supabase";
   /** True when clients live in SKA OS (Supabase mode): no create/edit/delete in TeleCRM. */
   clientsManagedExternally?: boolean;
+  /** True when TELEPHONY_PROVIDER=exotel: calls are real, no simulated outcomes in the UI. */
+  liveTelephony?: boolean;
 }
 
 /** Result of every routing step: what the IVR/telephony layer must do next. */

@@ -43,7 +43,7 @@ export function CallDetails({ d, reload }: { d: Detail; reload: () => void }) {
     setBusy(true);
     try {
       const r = await apiFetch<{ transfer: { status: string } }>("/api/call/transfer", {
-        body: { call_id: c.id, to_member_id: to, department_id: dept || null, result: c.is_simulated ? result : undefined, idempotencyKey: newKey() },
+        body: { call_id: c.id, to_member_id: to, department_id: dept || null, result, idempotencyKey: newKey() },
       });
       toast.success(`Transfer ${r.transfer.status}`);
       reload();
@@ -86,7 +86,7 @@ export function CallDetails({ d, reload }: { d: Detail; reload: () => void }) {
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="To agent" error={toErr} required hint={narrowedAgents ? `Showing ${deptName} members — clear the department to see everyone` : undefined}><Select value={to} onChange={chooseAgent} options={[{ value: "", label: "— choose —" }, ...agents]} placeholder="— choose —" invalid={!!toErr} aria-label="To agent" searchPlaceholder="Search team…" /></Field>
               <Field label="Department" hint={narrowedDepts ? "Showing this agent's departments only" : "Answered transfer to a member seeds sticky"}><Select value={dept} onChange={chooseDept} options={deptOpts} aria-label="Department" /></Field>
-              {c.is_simulated && <Field label="Simulated result"><Select value={result} onChange={(r) => setResult(r as DialResult)} options={RESULTS} aria-label="Simulated result" /></Field>}
+              <Field label={c.is_simulated ? "Simulated result" : "Did they take the call?"} hint={c.is_simulated ? undefined : "Transfer on your phone first, then record the outcome"}><Select value={result} onChange={(r) => setResult(r as DialResult)} options={RESULTS} aria-label="Transfer result" /></Field>
             </div>
             <Button className="mt-3" loading={busy} onClick={transfer}>Transfer</Button>
           </Card>

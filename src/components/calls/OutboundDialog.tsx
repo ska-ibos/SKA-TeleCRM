@@ -10,6 +10,7 @@ import type { DialResult, TeamMember } from "@/types";
 /** Click-to-call through the CRM. In simulation mode the outcome is chosen here. */
 export function OutboundDialog({ open, onClose, phones, onDone, at }: { open: boolean; onClose: () => void; phones: string[]; onDone?: () => void; at?: string }) {
   const { user } = useUser();
+  const live = Boolean(user.liveTelephony);
   const toast = useToast();
   const team = useApi<TeamMember[]>(open ? "/api/team" : null);
   const [agent, setAgent] = useState(user.memberId ?? "");
@@ -29,24 +30,28 @@ export function OutboundDialog({ open, onClose, phones, onDone, at }: { open: bo
     if (Object.keys(errs).length) return setErrors(errs);
     setBusy(true);
     try {
-      await apiFetch("/api/call/outbound", { body: { agent_id: agent, to: to || phones[0], result, at, idempotencyKey: `${key}-${agent}-${to}-${result}` } });
-      toast.success("Outbound call saved to history");
+      await apiFetch("/api/call/outbound", { body: { agent_id: agent, to: to || phones[0], result: live ? undefined : result, at: live ? undefined : at, idempotencyKey: `${key}-${agent}-${to}-${result}` } });
+      toast.success(live ? "Calling - your phone will ring first, then the client" : "Outbound call saved to history");
       onDone?.(); onClose();
     } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
   return (
-    <Modal open={open} onClose={onClose} title="Call client" footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={busy} onClick={call}>Place call</Button></>}>
+    <Modal open={open} onClose={onClose} title="Call client" footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={busy} onClick={call}>{live ? "Call now" : "Place call"}</Button></>}>
       <div className="space-y-4">
-        <p className="rounded-xl bg-brass-100 px-3 py-2 text-xs font-semibold text-[#6f4f12]">SIMULATION — NO REAL PHONE CALL (until Exotel is configured)</p>
+        {live
+          ? <p className="rounded-xl bg-brand-50 px-3 py-2 text-xs font-medium text-brand-800">Exotel rings the agent's mobile first, then the client. The client sees the office number.</p>
+          : <p className="rounded-xl bg-brass-100 px-3 py-2 text-xs font-semibold text-[#6f4f12]">SIMULATION — NO REAL PHONE CALL (until Exotel is configured)</p>}
         <Field label="Agent" error={errors.agent} required>
           <Select value={agent} onChange={(a) => { setAgent(a); setErrors((x) => ({ ...x, agent: "" })); }} options={agents} placeholder="— choose —" disabled={user.role === "agent"} invalid={!!errors.agent} aria-label="Agent" searchPlaceholder="Search team…" />
         </Field>
         {(phones.length > 1 || errors.to) && (
           <Field label="Number" error={errors.to}><Select value={to} onChange={setTo} options={numbers} invalid={!!errors.to} aria-label="Number" /></Field>
         )}
-        <Field label="Simulated outcome">
-          <Select value={result} onChange={(r) => setResult(r as DialResult)} options={OUTCOMES} aria-label="Simulated outcome" />
-        </Field>
+        {!live && (
+          <Field label="Simulated outcome">
+            <Select value={result} onChange={(r) => setResult(r as DialResult)} options={OUTCOMES} aria-label="Simulated outcome" />
+          </Field>
+        )}
       </div>
     </Modal>
   );

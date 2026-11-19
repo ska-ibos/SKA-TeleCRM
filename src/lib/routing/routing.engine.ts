@@ -169,14 +169,14 @@ export async function handleInput(ctx: EngineCtx, callId: string, rawDigits: str
     if (dept.kind === "crm") return routeToCrm(ctx, l, "Key 1 -> CRM desk");
 
     if (dept.kind === "missed_call") {
-      const hit = await findLatestOutboundAgent(ctx.store, { clientId: l.call.client_id, phone: l.call.from_number, now: ctx.now });
+      const hit = await findLatestOutboundAgent(ctx.store, { clientId: l.call.client_id, phone: l.call.from_number, now: ctx.now, simulated: l.call.is_simulated });
       if (!hit) return routeToCrm(ctx, l, "Key 2 -> no outbound history, CRM desk");
       return dial(ctx, l, hit.agent, `Key 2 -> latest outbound agent ${hit.agent.full_name}`, "crm");
     }
 
     const sticky = await findStickyAgent(ctx.store, {
       clientId: l.call.client_id, phone: l.call.from_number, departmentId: dept.id,
-      now: ctx.now, stickyDays: cfg.sticky_days, excludeCallId: l.call.id,
+      now: ctx.now, stickyDays: cfg.sticky_days, excludeCallId: l.call.id, simulated: l.call.is_simulated,
     });
     if (!sticky) return routeToCrm(ctx, l, `Key ${key} (${dept.name}) -> no valid sticky agent, CRM desk`);
     await save(ctx, l, { route_reason: `Key ${key} (${dept.name}) -> sticky ${sticky.agent.full_name}` },
@@ -206,9 +206,13 @@ export async function handleStickyChoice(ctx: EngineCtx, callId: string, digit: 
   return routeToCrm(ctx, l, digit === "2" ? "Caller chose CRM desk" : "Invalid sticky choice -> CRM desk");
 }
 
+/** Live telephony rings the agent's mobile: without a number the agent cannot be reached. */
+const unreachable = (ctx: EngineCtx, agent: TeamMember) => !ctx.provider.isSimulation && !agent.phone;
+
 async function dial(ctx: EngineCtx, l: Loaded, agent: TeamMember, reason: string, fallback: "crm" | "voicemail"): Promise<RouteStep> {
-  if (!agent.is_active || agent.status !== "available") {
-    const why = `${agent.full_name} is ${agent.is_active ? agent.status : "inactive"}`;
+  if (!agent.is_active || agent.status !== "available" || unreachable(ctx, agent)) {
+    const why = !agent.is_active ? `${agent.full_name} is inactive`
+      : agent.status !== "available" ? `${agent.full_name} is ${agent.status}` : `${agent.full_name} has no phone number in TeleCRM`;
     if (fallback === "crm") return routeToCrm(ctx, l, `${reason}; ${why} -> CRM desk`, [agent.id]);
     return toVoicemail(ctx, l, `${reason}; ${why}`);
   }
@@ -220,7 +224,7 @@ async function dial(ctx: EngineCtx, l: Loaded, agent: TeamMember, reason: string
 }
 
 async function routeToCrm(ctx: EngineCtx, l: Loaded, reason: string, exclude: string[] = []): Promise<RouteStep> {
-  const desk = await pickCrmDesk(ctx.store, exclude);
+  const desk = await pickCrmDesk(ctx.store, exclude, { requirePhone: !ctx.provider.isSimulation });
   if (!desk) return toVoicemail(ctx, l, `${reason}; CRM desk unavailable`);
   return dial(ctx, l, desk, reason.includes("CRM") ? reason : `${reason} -> CRM desk`, "voicemail");
 }
@@ -329,6 +333,7 @@ export async function completeTransfer(ctx: EngineCtx, transferId: string, resul
 export async function placeOutbound(ctx: EngineCtx, p: { agentId: string; to: string; result?: DialResult }) {
   const agent = await agentOf(ctx, p.agentId);
   if (!agent || !agent.is_active) throw notFound("Agent");
+  if (unreachable(ctx, agent)) throw badRequest(`Add a mobile number for ${agent.full_name} under Team first - Exotel rings the agent before the client`);
   const phone = normalizePhone(p.to);
   if (!phone) throw badRequest("Destination is not a valid phone number");
   const client = await findClientByPhone(ctx.store, phone);
@@ -339,7 +344,17 @@ export async function placeOutbound(ctx: EngineCtx, p: { agentId: string; to: st
     is_simulated: ctx.provider.isSimulation, provider: ctx.provider.name, started_at: ctx.now.toISOString(),
     route_reason: `Outbound by ${agent.full_name}`,
   });
-  const { providerCallId } = await ctx.provider.placeOutbound({ callId: call.id, agent, to: phone });
+  let providerCallId: string | null;
+  try {
+    ({ providerCallId } = await ctx.provider.placeOutbound({ callId: call.id, agent, to: phone }));
+  } catch (e) {
+    // the provider refused the call (credentials, trial limits, KYC...): keep the row, but closed as failed
+    await ctx.store.update<Call>("calls", call.id, {
+      status: "failed", ended_at: ctx.now.toISOString(),
+      route_reason: `Outbound by ${agent.full_name}; provider error: ${(e as Error).message}`.slice(0, 1000),
+    });
+    throw e instanceof AppError ? e : new AppError(502, "provider_error", `The call could not be placed: ${(e as Error).message}`);
+  }
   call = await ctx.store.update<Call>("calls", call.id, { provider_call_id: providerCallId });
   if (p.result) call = await completeOutbound(ctx, call.id, p.result);
   return call;

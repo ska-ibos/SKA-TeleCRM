@@ -16,9 +16,13 @@ export const DEPARTMENT_SEED: { key: number; name: string; kind: "crm" | "missed
 ];
 
 export interface OfficeHours { timezone: string; days: number[]; start: string; end: string }
-export interface Prompts { greeting: string; reprompt: string; after_hours: string; connecting: string }
+export interface Prompts { greeting: string; reprompt: string; after_hours: string; connecting: string; known_caller: string; recording_notice: string }
 /** Played while an agent who has an extension is rung. {name} and {extension} are filled in. */
 export const DEFAULT_CONNECTING_PROMPT = "Connecting you to {name}. To reach {name} directly next time, enter extension {extension} when you call.";
+
+export const DEFAULT_KNOWN_CALLER_PROMPT = "Namaste {name} ji.";
+/** Legal notice that the call is recorded (Exotel records live calls). Empty = not spoken. */
+export const DEFAULT_RECORDING_NOTICE = "This call may be recorded for quality and training purposes.";
 
 export const DEFAULT_ROUTING_CONFIG = {
   sticky_days: 3,
@@ -31,6 +35,9 @@ export const DEFAULT_ROUTING_CONFIG = {
     after_hours:
       "Thank you for calling Single Key Advisory. Our office hours are Monday to Saturday, 10 AM to 7 PM. Please leave a message after the tone and we will call you back.",
     connecting: DEFAULT_CONNECTING_PROMPT,
+    // spoken before the greeting on live calls; {name} = the caller's client name (known callers only)
+    known_caller: DEFAULT_KNOWN_CALLER_PROMPT,
+    recording_notice: DEFAULT_RECORDING_NOTICE,
   } as Prompts,
 };
 export type RoutingConfig = typeof DEFAULT_ROUTING_CONFIG;

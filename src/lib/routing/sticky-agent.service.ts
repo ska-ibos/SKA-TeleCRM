@@ -14,11 +14,12 @@ export interface StickyMatch { agent: TeamMember; answeredAt: string; expiresAt:
  */
 export async function findStickyAgent(
   store: Store,
-  p: { clientId: string | null; phone: string; departmentId: string; now: Date; stickyDays: number; excludeCallId?: string },
+  p: { clientId: string | null; phone: string; departmentId: string; now: Date; stickyDays: number; excludeCallId?: string; simulated: boolean },
 ): Promise<StickyMatch | null> {
   const key = p.clientId ? { client_id: p.clientId } : { from_number: p.phone };
   const calls = await store.list<Call>("calls", {
-    eq: { ...key, direction: "inbound", department_id: p.departmentId },
+    // simulated and real calls never influence each other (simulator on the live database)
+    eq: { ...key, direction: "inbound", department_id: p.departmentId, is_simulated: p.simulated },
     notNull: ["answered_agent_id", "answered_at"],
     lte: { answered_at: p.now.toISOString() },
     order: { column: "answered_at", ascending: false },

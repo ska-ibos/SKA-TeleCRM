@@ -12,13 +12,15 @@ The caller number is normalised to E.164 and matched against `client_phone_numbe
 - A fresh qualifying conversation therefore resets the expiry automatically — no separate sticky table to drift.
 - The CRM desk answering a department call does **not** create a sticky (not a department member). A CRM-desk **transfer** answered by a department member **does** (sticky learning).
 - Exotel native sticky is never used.
+- Simulated calls only count for simulated callers, real calls only for real ones (the simulator can run on the live database).
+- Live calls: Exotel has no transfer API on the PSTN plan, so the agent transfers on the handset and records the outcome in TeleCRM; an answered transfer to a department member seeds the sticky.
 - No valid sticky → CRM desk.
 
 ## Missed-call (key 2)
 Latest `calls` row with `direction = outbound` to the caller's number (or the caller's client) with `initiated_by` set → that agent. No history, agent inactive/busy/offline, or no answer → CRM desk.
 
 ## Availability
-`team_members.status`: `available` is dialled; `busy` / `offline` skip straight to the fallback. Dial outcomes `busy` / `no_answer` / `failed` also fall back.
+`team_members.status`: `available` is dialled; `busy` / `offline` skip straight to the fallback. Dial outcomes `busy` / `no_answer` / `failed` also fall back. On live calls an agent without a mobile number in TeleCRM is also skipped.
 
 ## Fallback chain
 target agent → CRM desk (first *available* member of key-1 department or `is_crm_desk`) → voicemail + callback reminder.

@@ -1,6 +1,6 @@
 import { api, ok, readJson } from "@/lib/utils/response";
 import { apiCtx, param } from "@/lib/api/context";
-import { memberDepartmentsSchema, statusSchema, teamMemberSchema, uuid } from "@/lib/validations";
+import { memberDepartmentsSchema, statusSchema, teamMemberPatchSchema, teamMemberSchema, uuid } from "@/lib/validations";
 import { forbidden } from "@/lib/data/types";
 import { assertAssignableDepartments, createMember, listEmployees, listTeam, setMemberDepartments, updateMember } from "@/lib/services/team.service";
 
@@ -36,7 +36,7 @@ export const PATCH = api(async (req) => {
   }
   if (user.role !== "admin") throw forbidden();
   const id = uuid.parse(param(req, "id"));
-  const input = teamMemberSchema.partial().parse(body);
+  const input = teamMemberPatchSchema.parse(body);
   const { department_ids } = memberDepartmentsSchema.parse(body);
   if (department_ids) await assertAssignableDepartments(store, department_ids);
   const m = await updateMember(store, id, input, user.memberId);

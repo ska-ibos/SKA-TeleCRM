@@ -1,8 +1,10 @@
 import type { Store } from "../data/types";
 import { listCalls } from "./call.service";
 
-export async function buildReport(store: Store, range: { from?: string; to?: string }) {
-  const calls = await listCalls(store, { ...range, limit: 2000 });
+/** `excludeSimulated`: with live telephony, simulator test calls must not skew the real numbers. */
+export async function buildReport(store: Store, range: { from?: string; to?: string }, opts: { excludeSimulated?: boolean } = {}) {
+  const all = await listCalls(store, { ...range, limit: 2000 });
+  const calls = opts.excludeSimulated ? all.filter((c) => !c.is_simulated) : all;
   const inbound = calls.filter((c) => c.direction === "inbound");
   const answered = calls.filter((c) => c.answered_at);
   const missed = calls.filter((c) => ["missed", "voicemail", "no_answer", "busy", "failed"].includes(c.status));
@@ -32,5 +34,7 @@ export async function buildReport(store: Store, range: { from?: string; to?: str
     byAgent: group((c) => c.agent_name),
     byIvrInput: group((c) => (c.direction === "inbound" ? (c.ivr_input ?? "none") : null)).filter((g) => g.name !== "—"),
     calls,
+    /** rows read before filtering (the 2,000 cap applies to this) */
+    scanned: all.length,
   };
 }

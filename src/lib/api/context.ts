@@ -13,9 +13,11 @@ export async function apiCtx(permission?: Permission) {
 
 /** Engine context. `at` lets the simulator/tests control the clock (sticky expiry, office hours). */
 export async function engineCtx(opts: { at?: string; simulation?: boolean } = {}): Promise<EngineCtx> {
-  const now = opts.at ? new Date(opts.at) : new Date();
+  const provider = getProvider(opts.simulation ? "simulation" : undefined);
+  // a caller-supplied clock is a simulator feature only: real calls always use the server time
+  const now = opts.at && provider.isSimulation ? new Date(opts.at) : new Date();
   if (Number.isNaN(now.getTime())) throw badRequest("Invalid simulated date");
-  return { store: await getStore(), provider: getProvider(opts.simulation ? "simulation" : undefined), now };
+  return { store: await getStore(), provider, now };
 }
 
 export const param = (req: Request, key: string) => new URL(req.url).searchParams.get(key) ?? undefined;

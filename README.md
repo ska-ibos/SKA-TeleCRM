@@ -2,7 +2,7 @@
 
 Operations CRM with a smart call-routing engine: Operations IVR, extensions, CRM desk, missed-call callback, per-department sticky agents (3-day), after-hours voicemail, transfers, reminders, reports and audit. **Operations only — no Sales features.**
 
-Telephony runs in **simulation mode** (no real phone calls) until Exotel credentials and official API details are provided.
+Telephony runs in **simulation mode** by default. Set `TELEPHONY_PROVIDER=exotel` plus the Exotel variables for real calls — see [docs/exotel-integration.md](docs/exotel-integration.md) for the server settings and the call flow to build in Exotel.
 
 ## Quick start
 

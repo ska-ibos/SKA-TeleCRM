@@ -6,15 +6,15 @@ import type { Call, TeamMember } from "@/types";
  * e.g. Hiren calls Rahul -> Rahul calls back, presses 2 -> Hiren.
  */
 export async function findLatestOutboundAgent(
-  store: Store, p: { clientId: string | null; phone: string; now: Date },
+  store: Store, p: { clientId: string | null; phone: string; now: Date; simulated: boolean },
 ): Promise<{ agent: TeamMember; callId: string; at: string } | null> {
   const byPhone = await store.list<Call>("calls", {
-    eq: { direction: "outbound", to_number: p.phone }, notNull: ["initiated_by"],
+    eq: { direction: "outbound", to_number: p.phone, is_simulated: p.simulated }, notNull: ["initiated_by"],
     lte: { started_at: p.now.toISOString() }, order: { column: "started_at", ascending: false }, limit: 1,
   });
   const byClient = p.clientId
     ? await store.list<Call>("calls", {
-        eq: { direction: "outbound", client_id: p.clientId }, notNull: ["initiated_by"],
+        eq: { direction: "outbound", client_id: p.clientId, is_simulated: p.simulated }, notNull: ["initiated_by"],
         lte: { started_at: p.now.toISOString() }, order: { column: "started_at", ascending: false }, limit: 1,
       })
     : [];

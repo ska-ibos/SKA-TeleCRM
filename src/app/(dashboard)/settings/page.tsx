@@ -15,9 +15,9 @@ const TIMEZONES: Option[] = (() => {
   if (!zones.includes("Asia/Kolkata")) zones = ["Asia/Kolkata", ...zones];
   return zones.map((z) => ({ value: z, label: z.replace(/_/g, " "), keywords: z === "Asia/Kolkata" ? "india ist calcutta" : undefined }));
 })();
-const PROMPT_LIMITS = { greeting: 1000, reprompt: 500, after_hours: 1000, connecting: 300 } as const;
-const PROMPT_LABELS = { greeting: "Greeting", reprompt: "Re-prompt", after_hours: "After hours", connecting: "Connecting announcement" } as const;
-const PROMPT_HINTS: Partial<Record<keyof typeof PROMPT_LIMITS, string>> = { connecting: "Played while an agent with an extension is rung. Use {name} and {extension}." };
+const PROMPT_LIMITS = { known_caller: 200, recording_notice: 300, greeting: 1000, reprompt: 500, after_hours: 1000, connecting: 300 } as const;
+const PROMPT_LABELS = { known_caller: "Known-caller welcome", recording_notice: "Recording notice", greeting: "Greeting", reprompt: "Re-prompt", after_hours: "After hours", connecting: "Connecting announcement" } as const;
+const PROMPT_HINTS: Partial<Record<keyof typeof PROMPT_LIMITS, string>> = { known_caller: "Spoken first when the caller is a recognised client. {name} = client name. Leave empty to skip.", recording_notice: "Spoken at the start of every live call. Leave empty to skip.", connecting: "Played while an agent with an extension is rung. Use {name} and {extension}." };
 import type { RoutingConfig } from "@/lib/constants";
 import type { AuditLog } from "@/types";
 
@@ -83,7 +83,7 @@ export default function SettingsPage() {
 
         <Card title={<span className="flex items-center gap-2"><MessageSquareText className="h-4 w-4" />IVR prompts</span>} className="lg:col-span-3">
           <fieldset disabled={!admin} className="grid gap-4 lg:grid-cols-2">
-            {(["greeting", "reprompt", "after_hours", "connecting"] as const).map((k) => (
+            {(["known_caller", "recording_notice", "greeting", "reprompt", "after_hours", "connecting"] as const).map((k) => (
               <Field key={k} label={PROMPT_LABELS[k]} error={errors[`prompts.${k}`]} hint={PROMPT_HINTS[k]}>
                 <textarea className={cx("input min-h-28", errors[`prompts.${k}`] && "input-error")} maxLength={PROMPT_LIMITS[k]} value={cfg.prompts[k]} onChange={(e) => { setCfg({ ...cfg, prompts: { ...cfg.prompts, [k]: e.target.value } }); setErrors((x) => ({ ...x, [`prompts.${k}`]: "" })); }} />
                 <span className="mt-1 flex justify-end"><CharCount value={cfg.prompts[k]} max={PROMPT_LIMITS[k]} /></span>
