@@ -2,7 +2,7 @@ import { api, ok, readJson } from "@/lib/utils/response";
 import { apiCtx, param } from "@/lib/api/context";
 import { memberDepartmentsSchema, statusSchema, teamMemberPatchSchema, teamMemberSchema, uuid } from "@/lib/validations";
 import { forbidden } from "@/lib/data/types";
-import { assertAssignableDepartments, createMember, listEmployees, listTeam, setMemberDepartments, updateMember } from "@/lib/services/team.service";
+import { assertAssignableDepartments, createMember, deleteMember, listEmployees, listTeam, setMemberDepartments, updateMember } from "@/lib/services/team.service";
 
 /** GET /api/team - team. GET /api/team?employees=1 - SKA OS employees available to link (admin). */
 export const GET = api(async (req) => {
@@ -42,4 +42,11 @@ export const PATCH = api(async (req) => {
   const m = await updateMember(store, id, input, user.memberId);
   if (department_ids) await setMemberDepartments(store, id, department_ids, user.memberId); // omitted = leave as is
   return ok(m);
+});
+
+/** DELETE ?id= (admin): only members with no history; others are deactivated instead. */
+export const DELETE = api(async (req) => {
+  const { store, user } = await apiCtx("team:write");
+  await deleteMember(store, uuid.parse(param(req, "id")), user.memberId);
+  return ok(true);
 });

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import { Pencil, Plus } from "lucide-react";
-import { Avatar, Badge, Button, Card, Empty, ErrorBox, Field, Loading, Modal, Pagination, StatusDot, enter, statusTone, useToast } from "../common/ui";
+import { Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Avatar, Badge, Button, Card, ConfirmButton, Empty, ErrorBox, Field, Loading, Modal, Pagination, StatusDot, enter, statusTone, useToast } from "../common/ui";
 import { usePagination } from "@/hooks/usePagination";
 import { apiFetch, ApiError, useApi } from "@/hooks/useApi";
 import { useUser } from "../layout/UserContext";
@@ -63,6 +63,20 @@ export function TeamManager() {
       setEdit(null); q.reload();
     } catch (e) { setErrors((e as ApiError).fields); toast.error((e as Error).message); } finally { setBusy(false); }
   }
+  async function setActive(m: Row, active: boolean) {
+    try {
+      await apiFetch(`/api/team?id=${m.id}`, { method: "PATCH", body: { is_active: active } });
+      toast.success(active ? `${m.full_name} reactivated` : `${m.full_name} deactivated - no longer rung or able to sign in`);
+      q.reload();
+    } catch (e) { toast.error((e as Error).message); }
+  }
+  async function remove(m: Row) {
+    try {
+      await apiFetch(`/api/team?id=${m.id}`, { method: "DELETE" });
+      toast.success(`${m.full_name} removed`);
+      q.reload();
+    } catch (e) { toast.error((e as Error).message); }
+  }
   const set = (k: keyof typeof blank) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setV({ ...v, [k]: e.target.type === "checkbox" ? e.target.checked : k === "email" ? e.target.value.replace(/\s/g, "") : e.target.value });
     setErrors((x) => ({ ...x, [k]: "" }));
@@ -75,6 +89,7 @@ export function TeamManager() {
 
   return (
     <Card title={`Team (${q.data?.length ?? 0})`} actions={admin && <Button size="sm" onClick={() => open("new")}><Plus className="h-3 w-3" />Add member</Button>}>
+      {!admin && <p className="mb-4 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">Only TeleCRM admins can add, edit or remove team members. SKA OS workspace admins are TeleCRM admins - ask one to sign in, or to make you an admin here.</p>}
       {q.error ? <ErrorBox message={q.error} onRetry={q.reload} /> : q.loading ? <Loading rows={6} /> : !q.data?.length ? <Empty title="No team members" /> : (
         <div className="table-bleed">
           <table className="table">
@@ -97,7 +112,19 @@ export function TeamManager() {
                 <td className="font-mono text-[13px]">{m.extension ?? "—"}</td>
                 <td className="whitespace-nowrap font-mono text-[13px]">{formatPhone(m.phone)}</td>
                 <td><Badge tone={statusTone(m.status)}>{m.status}</Badge></td>
-                <td>{admin && <Button size="sm" variant="ghost" onClick={() => open(m)} aria-label={`Edit ${m.full_name}`}><Pencil className="h-3 w-3" /></Button>}</td>
+                <td>{admin && (
+                  <div className="flex justify-end gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => open(m)} aria-label={`Edit ${m.full_name}`} title="Edit"><Pencil className="h-3 w-3" /></Button>
+                    <ConfirmButton size="sm" variant="ghost" aria-label={m.is_active ? `Deactivate ${m.full_name}` : `Reactivate ${m.full_name}`} title={m.is_active ? "Deactivate" : "Reactivate"}
+                      message={m.is_active ? `Deactivate ${m.full_name}? They will not be rung and cannot sign in. History is kept.` : `Reactivate ${m.full_name}?`}
+                      onConfirm={() => setActive(m, !m.is_active)}><Power className={`h-3 w-3 ${m.is_active ? "" : "text-emerald-600"}`} /></ConfirmButton>
+                    {m.id !== user.memberId && (
+                      <ConfirmButton size="sm" variant="ghost" aria-label={`Delete ${m.full_name}`} title="Delete"
+                        message={`Delete ${m.full_name}? Only possible if they have no calls, notes or reminders - otherwise deactivate them.`}
+                        onConfirm={() => remove(m)}><Trash2 className="h-3 w-3 text-rose-600" /></ConfirmButton>
+                    )}
+                  </div>
+                )}</td>
               </tr>))}
             </tbody>
           </table>

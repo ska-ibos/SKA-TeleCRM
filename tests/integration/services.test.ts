@@ -92,3 +92,19 @@ describe("reports", () => {
     expect(r.totals.total).toBe(0);
   });
 });
+
+describe("team member delete", () => {
+  it("removes a member with no history, and refuses one with history", async () => {
+    const { MemoryStore } = await import("@/lib/data/memory.store");
+    const { createMember, deleteMember } = await import("@/lib/services/team.service");
+    const store = new MemoryStore();
+    const fresh = await createMember(store, { full_name: "Added By Mistake", role: "agent", status: "offline", is_crm_desk: false, is_active: true, email: null, phone: null }, null);
+    await deleteMember(store, fresh.id, null);
+    expect(await store.get("team_members", fresh.id)).toBeNull();
+
+    const busy = await createMember(store, { full_name: "Has History", role: "agent", status: "available", is_crm_desk: false, is_active: true, email: null, phone: null }, null);
+    await store.insert("calls", { direction: "outbound", from_number: "OPS", to_number: "+919800000001", status: "completed", initiated_by: busy.id, provider: "simulation", started_at: new Date().toISOString(), is_simulated: true });
+    await expect(deleteMember(store, busy.id, null)).rejects.toThrow(/Deactivate them instead/);
+    await expect(deleteMember(store, busy.id, busy.id)).rejects.toThrow(/cannot delete yourself/);
+  });
+});
