@@ -24,22 +24,27 @@ async function gstCall(t: Awaited<ReturnType<typeof setup>>, agent: string, now 
 }
 
 describe("who sees what", () => {
-  it("agents see only the clients and calls they dealt with", async () => {
+  it("agents see every client, but only their own calls in the call lists", async () => {
     const t = await setup();
     const other = await t.store.insert<{ id: string }>("clients", { name: "Other Client", status: "active" });
     const callId = await gstCall(t, "Hiren");
 
+    const sneha = await scopeFor(t.store, userOf(t, "Sneha", "agent")); // never dealt with anyone
+    expect((await listClients(t.store, {}, sneha)).map((c) => c.name).sort()).toEqual(["Other Client", "Rahul Client"]);
+    expect((await getClientDetail(t.store, other.id, sneha)).client.name).toBe("Other Client");
+    expect(await listCalls(t.store, {}, sneha)).toEqual([]);
+    // a client's call can be opened from the client page...
+    expect((await getCallDetail(t.store, callId, { scope: sneha })).call.id).toBe(callId);
+    // ...but its recording stays with whoever handled it
+    expect(canHearRecording(userOf(t, "Sneha", "agent"), sneha, (await t.store.get<Call>("calls", callId))!)).toBe(false);
+
     const hiren = await scopeFor(t.store, userOf(t, "Hiren", "agent"));
-    expect((await listClients(t.store, {}, hiren)).map((c) => c.name)).toEqual(["Rahul Client"]);
-    await expect(getClientDetail(t.store, other.id, hiren)).rejects.toThrow(/not found/);
     expect((await listCalls(t.store, {}, hiren)).map((c) => c.id)).toEqual([callId]);
 
-    const sneha = await scopeFor(t.store, userOf(t, "Sneha", "agent"));
-    expect(await listClients(t.store, {}, sneha)).toEqual([]);
-    await expect(getCallDetail(t.store, callId, { scope: sneha })).rejects.toThrow(/not found/);
-
-    const desk = await scopeFor(t.store, userOf(t, "Jinofer", "crm_desk"));
-    expect(await listClients(t.store, {}, desk)).toHaveLength(2);
+    // unknown callers' calls (no client) stay with the people on them
+    const s = await E.startInbound(t.ctx(at(MON_11AM, 1)), { from: "+919811155566" });
+    await E.handleInput(t.ctx(at(MON_11AM, 1)), s.callId, "1");
+    await expect(getCallDetail(t.store, s.callId, { scope: sneha })).rejects.toThrow(/not found/);
   });
 
   it("managers also see every call in their departments", async () => {

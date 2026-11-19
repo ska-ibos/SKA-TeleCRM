@@ -1,7 +1,7 @@
 import type { Store } from "../data/types";
 import { notFound } from "../data/types";
 import type { Call, CallSession, CallTransfer, Client, Department, Note, SessionUser, TeamMember } from "@/types";
-import { canHearRecording, canSeeCall, type Scope } from "./access.service";
+import { canHearRecording, canOpenCall, canSeeCall, type Scope } from "./access.service";
 
 export interface CallFilters { status?: string; direction?: string; agentId?: string; departmentId?: string; from?: string; to?: string; q?: string; limit?: number }
 
@@ -47,7 +47,7 @@ export interface Recording { id: string; call_id: string; kind: "call" | "voicem
 export async function getCallDetail(store: Store, id: string, opts: { scope?: Scope; user?: SessionUser } = {}) {
   const scope = opts.scope ?? { all: true };
   const call = await store.get<Call>("calls", id);
-  if (!call || !canSeeCall(scope, call)) throw notFound("Call");
+  if (!call || !canOpenCall(scope, call)) throw notFound("Call");
   const [[enriched], [session], transfers, notes, team] = await Promise.all([
     enrichCalls(store, [call]),
     store.list<CallSession>("call_sessions", { eq: { call_id: id } }),

@@ -68,7 +68,8 @@ Supabase advisor: "RLS enabled, no policy" on 15 tables is intentional (server-o
 
 | | admin | crm_desk | manager | agent |
 |---|---|---|---|---|
-| Clients & calls visible | all | all | own + their departments' calls | own calls + clients they dealt with |
+| View clients (list, client page with full history) | all | all | all | all |
+| Call history list | all | all | own + their departments' calls | own calls |
 | Hear recordings | ✓ | own calls | their departments' calls | own calls |
 | Link an unknown caller to a client | ✓ | ✓ | ✓ | – |
 | Add caller-ID numbers / tags | ✓ | ✓ | ✓ | – |

@@ -4,7 +4,7 @@ import type { Call, CallSession, Client, ClientTag, Department, Note, Tag, TeamM
 import { findStickyAgent } from "../routing/sticky-agent.service";
 import { findLatestOutboundAgent } from "../routing/missed-call.service";
 import { loadRoutingConfig } from "../routing/department.service";
-import { canSeeCall, type Scope } from "./access.service";
+import { canOpenCall, type Scope } from "./access.service";
 
 /**
  * Caller context for the screen-pop and the call page (spec v1.1 §8.8): who is calling,
@@ -14,7 +14,7 @@ import { canSeeCall, type Scope } from "./access.service";
  */
 export async function callerContext(store: Store, callId: string, scope: Scope, at?: Date) {
   const call = await store.get<Call>("calls", callId);
-  if (!call || !canSeeCall(scope, call)) throw notFound("Call");
+  if (!call || !canOpenCall(scope, call)) throw notFound("Call");
   // simulated calls live on the simulator's clock
   const now = at ?? (call.is_simulated ? new Date(call.started_at) : new Date());
   const phone = call.direction === "inbound" ? call.from_number : call.to_number;

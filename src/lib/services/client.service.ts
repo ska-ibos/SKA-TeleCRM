@@ -35,7 +35,6 @@ export async function listClients(store: Store, f: { q?: string; status?: string
     eq: f.status ? { status: f.status } : undefined,
     order: { column: "created_at", ascending: false }, limit: 5000,
   });
-  if (!scope.all) clients = clients.filter((c) => canSeeClient(scope, c.id));
   const [phones, ctags, tags] = await Promise.all([
     store.list<ClientPhone>("client_phone_numbers"), store.list<ClientTag>("client_tags"), store.list<Tag>("tags"),
   ]);
