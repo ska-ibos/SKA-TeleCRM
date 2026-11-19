@@ -39,7 +39,7 @@ describe("IVR keys", () => {
     const s = await E.startInbound(t.ctx(MON_11AM), { from: t.phone });
     const r1 = await E.handleInput(t.ctx(MON_11AM), s.callId, "0");
     expect(r1.action).toBe("gather");
-    expect(r1.prompt).toMatch(/did not receive/);
+    expect(r1.prompt).toMatch(/sahi input nahi mila/);
     const r2 = await E.handleInput(t.ctx(MON_11AM), s.callId, "");
     expect(r2).toMatchObject({ action: "dial", agent: { name: "Jinofer" } });
   });
@@ -189,7 +189,7 @@ describe("fallbacks, after hours, transfers, state guards", () => {
     const t = await setup();
     const s = await E.startInbound(t.ctx(new Date(iso)), { from: t.phone });
     expect(s.action).toBe("voicemail");
-    expect(s.prompt).toMatch(/office hours/);
+    expect(s.prompt).toMatch(/Somvaar se Shanivaar/);
     const [r] = await t.store.list<Reminder>("reminders", { eq: { call_id: s.callId } });
     expect(r.source).toBe("after_hours");
     expect(new Date(r.due_at).getTime()).toBeGreaterThan(new Date(iso).getTime());

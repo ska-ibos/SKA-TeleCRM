@@ -32,8 +32,8 @@ describe("live prompts", () => {
   it("default the welcome and recording notice for settings saved before they existed", () => {
     const { known_caller: _k, recording_notice: _r, ...old } = DEFAULT_ROUTING_CONFIG.prompts;
     const cfg = routingConfigSchema.parse({ ...DEFAULT_ROUTING_CONFIG, prompts: old });
-    expect(cfg.prompts.known_caller).toBe("Namaste {name} ji.");
-    expect(cfg.prompts.recording_notice).toMatch(/recorded/);
+    expect(cfg.prompts.known_caller).toBe("Namaste {name} ji!");
+    expect(cfg.prompts.recording_notice).toMatch(/record ki ja rahi hai/);
   });
   it("allow an empty recording notice and reject unknown placeholders", () => {
     const p = { ...DEFAULT_ROUTING_CONFIG.prompts, recording_notice: "", known_caller: "Hello {client}" };

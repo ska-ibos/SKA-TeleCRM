@@ -42,7 +42,7 @@ export type SessionState = "greeting" | "sticky_offer" | "dialing" | "connected"
 export interface CallSession {
   id: string; call_id: string; state: SessionState; attempts: number;
   offered_agent_id: string | null; target_agent_id: string | null;
-  context: { fallback?: "crm" | "voicemail"; trail?: string[]; transferId?: string; departmentId?: string | null; candidateClientIds?: string[] };
+  context: { fallback?: "crm" | "voicemail"; pool?: "crm" | "department"; poolDept?: string | null; tried?: string[]; trail?: string[]; transferId?: string; departmentId?: string | null; candidateClientIds?: string[] };
   /** Optimistic lock, bumped on every update. */
   version: number;
   created_at: string; updated_at: string;

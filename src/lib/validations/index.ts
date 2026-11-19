@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { normalizePhone } from "../utils/phone";
 import { isoRangeIssues } from "../utils/date-range";
-import { DEFAULT_CONNECTING_PROMPT, DEFAULT_KNOWN_CALLER_PROMPT, DEFAULT_RECORDING_NOTICE } from "../constants";
+import { DEFAULT_CONNECTING_PROMPT, DEFAULT_KNOWN_CALLER_PROMPT, DEFAULT_RECORDING_NOTICE, DEFAULT_ROUTING_CONFIG, DEFAULT_STICKY_PROMPT } from "../constants";
 
 const trimmed = (min: number, max: number, label: string) =>
   z.string({ error: `${label} is required` }).trim()
@@ -133,6 +133,9 @@ export const routingConfigSchema = z.object({
   sticky_days: z.number().int().min(1).max(30),
   max_reprompts: z.number().int().min(0).max(3),
   office_hours: officeHoursSchema,
+  dept_miss_behavior: z.enum(["crm", "ring_department_group"]).default("crm"),
+  missed_call_window_days: z.number().int().min(0, "0 means no limit").max(365, "At most 365 days").default(0),
+  parallel_ring_max: z.number().int().min(1).max(10, "Exotel rings at most 10 numbers at once").default(1),
   prompts: z.object({
     greeting: trimmed(10, 1000, "Greeting"), reprompt: trimmed(5, 500, "Re-prompt"), after_hours: trimmed(10, 1000, "After-hours message"),
     connecting: trimmed(10, 300, "Connecting announcement")
@@ -143,6 +146,11 @@ export const routingConfigSchema = z.object({
       .refine((v) => !/\{(?!name\})[^}]*\}/.test(v), "Only {name} can be used")
       .default(DEFAULT_KNOWN_CALLER_PROMPT),
     recording_notice: z.string().trim().max(300, "Must be at most 300 characters").default(DEFAULT_RECORDING_NOTICE),
+    sticky_offer: trimmed(10, 300, "Sticky-agent prompt")
+      .refine((v) => v.includes("{name}"), "Include {name} so the caller hears who assisted them")
+      .refine((v) => !/\{(?!name\}|department\})[^}]*\}/.test(v), "Only {name} and {department} can be used")
+      .default(DEFAULT_STICKY_PROMPT),
+    voicemail: trimmed(10, 500, "Voicemail message").default(DEFAULT_ROUTING_CONFIG.prompts.voicemail),
   }),
 });
 

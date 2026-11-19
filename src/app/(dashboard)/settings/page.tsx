@@ -15,9 +15,9 @@ const TIMEZONES: Option[] = (() => {
   if (!zones.includes("Asia/Kolkata")) zones = ["Asia/Kolkata", ...zones];
   return zones.map((z) => ({ value: z, label: z.replace(/_/g, " "), keywords: z === "Asia/Kolkata" ? "india ist calcutta" : undefined }));
 })();
-const PROMPT_LIMITS = { known_caller: 200, recording_notice: 300, greeting: 1000, reprompt: 500, after_hours: 1000, connecting: 300 } as const;
-const PROMPT_LABELS = { known_caller: "Known-caller welcome", recording_notice: "Recording notice", greeting: "Greeting", reprompt: "Re-prompt", after_hours: "After hours", connecting: "Connecting announcement" } as const;
-const PROMPT_HINTS: Partial<Record<keyof typeof PROMPT_LIMITS, string>> = { known_caller: "Spoken first when the caller is a recognised client. {name} = client name. Leave empty to skip.", recording_notice: "Spoken at the start of every live call. Leave empty to skip.", connecting: "Played while an agent with an extension is rung. Use {name} and {extension}." };
+const PROMPT_LIMITS = { known_caller: 200, recording_notice: 300, greeting: 1000, reprompt: 500, sticky_offer: 300, connecting: 300, voicemail: 500, after_hours: 1000 } as const;
+const PROMPT_LABELS = { known_caller: "Known-caller welcome", recording_notice: "Recording notice", sticky_offer: "Sticky-agent offer", voicemail: "Voicemail (team busy)", greeting: "Greeting", reprompt: "Re-prompt", after_hours: "After hours", connecting: "Connecting announcement" } as const;
+const PROMPT_HINTS: Partial<Record<keyof typeof PROMPT_LIMITS, string>> = { sticky_offer: "After a department key when a sticky agent exists. Use {department} and {name}; 1 = that agent, 2 = CRM desk.", voicemail: "Played before the beep when nobody could take the call.", known_caller: "Spoken first when the caller is a recognised client. {name} = client name. Leave empty to skip.", recording_notice: "Spoken at the start of every live call. Leave empty to skip.", connecting: "Played while an agent with an extension is rung. Use {name} and {extension}." };
 import type { RoutingConfig } from "@/lib/constants";
 import type { AuditLog } from "@/types";
 
@@ -42,7 +42,12 @@ export default function SettingsPage() {
     const r = routingConfigSchema.safeParse(cfg);
     if (!r.success) { setErrors(zodErrors(r.error)); toast.error("Please fix the highlighted settings"); return; }
     setErrors({}); setBusy(true);
-    try { await apiFetch("/api/settings", { method: "PUT", body: r.data }); toast.success("Routing settings saved"); q.reload(); }
+    try {
+      const saved = await apiFetch<{ skipped?: string[] }>("/api/settings", { method: "PUT", body: r.data });
+      if (saved.skipped?.length) toast.error(`Saved, except ${saved.skipped.join(", ")}: the database needs the latest TeleCRM migration first`);
+      else toast.success("Routing settings saved");
+      q.reload();
+    }
     catch (e) { setErrors((e as ApiError).fields); toast.error((e as Error).message); } finally { setBusy(false); }
   }
   const oh = cfg.office_hours;
@@ -65,6 +70,12 @@ export default function SettingsPage() {
           <fieldset disabled={!admin} className="grid gap-4 sm:grid-cols-2">
             <Field label="Sticky validity (days)" error={errors.sticky_days}><input type="number" inputMode="numeric" min={1} max={30} step={1} className={cx("input", errors.sticky_days && "input-error")} value={Number.isNaN(cfg.sticky_days) ? "" : cfg.sticky_days} onChange={(e) => { setCfg({ ...cfg, sticky_days: e.target.value === "" ? NaN : Math.trunc(Number(e.target.value)) }); setErrors((x) => ({ ...x, sticky_days: "" })); }} /></Field>
             <Field label="Re-prompts on invalid input" error={errors.max_reprompts}><input type="number" inputMode="numeric" min={0} max={3} step={1} className={cx("input", errors.max_reprompts && "input-error")} value={Number.isNaN(cfg.max_reprompts) ? "" : cfg.max_reprompts} onChange={(e) => { setCfg({ ...cfg, max_reprompts: e.target.value === "" ? NaN : Math.trunc(Number(e.target.value)) }); setErrors((x) => ({ ...x, max_reprompts: "" })); }} /></Field>
+            <Field label="No sticky for a department" error={errors.dept_miss_behavior} hint={cfg.dept_miss_behavior === "crm" ? "CRM desk takes the call and transfers it, which teaches the sticky agent" : "Ring the department's free members, then the CRM desk"}>
+              <Select value={cfg.dept_miss_behavior} onChange={(v) => setCfg({ ...cfg, dept_miss_behavior: v as typeof cfg.dept_miss_behavior })} disabled={!admin} aria-label="No sticky for a department"
+                options={[{ value: "crm", label: "Send to CRM desk" }, { value: "ring_department_group", label: "Ring the department team" }]} />
+            </Field>
+            <Field label="People rung at once (CRM desk / team)" error={errors.parallel_ring_max} hint="1 = one after another. More than 1 needs Exotel parallel ringing (paid add-on)"><input type="number" inputMode="numeric" min={1} max={10} step={1} className={cx("input", errors.parallel_ring_max && "input-error")} value={Number.isNaN(cfg.parallel_ring_max) ? "" : cfg.parallel_ring_max} onChange={(e) => { setCfg({ ...cfg, parallel_ring_max: e.target.value === "" ? NaN : Math.trunc(Number(e.target.value)) }); setErrors((x) => ({ ...x, parallel_ring_max: "" })); }} /></Field>
+            <Field label="Key 2: follow outbound calls of the last … days" error={errors.missed_call_window_days} hint="0 = no limit"><input type="number" inputMode="numeric" min={0} max={365} step={1} className={cx("input", errors.missed_call_window_days && "input-error")} value={Number.isNaN(cfg.missed_call_window_days) ? "" : cfg.missed_call_window_days} onChange={(e) => { setCfg({ ...cfg, missed_call_window_days: e.target.value === "" ? NaN : Math.trunc(Number(e.target.value)) }); setErrors((x) => ({ ...x, missed_call_window_days: "" })); }} /></Field>
             <Field label="Opens" error={errors["office_hours.start"]}><input type="time" className={cx("input", errors["office_hours.start"] && "input-error")} value={oh.start} onChange={(e) => setOh({ start: e.target.value })} /></Field>
             <Field label="Closes" error={errors["office_hours.end"]}><input type="time" className={cx("input", errors["office_hours.end"] && "input-error")} value={oh.end} onChange={(e) => setOh({ end: e.target.value })} /></Field>
             <Field label="Timezone" error={errors["office_hours.timezone"]}><Select value={oh.timezone} onChange={(tz) => setOh({ timezone: tz })} options={TIMEZONES.some((o) => o.value === oh.timezone) ? TIMEZONES : [{ value: oh.timezone, label: oh.timezone }, ...TIMEZONES]} invalid={!!errors["office_hours.timezone"]} disabled={!admin} aria-label="Timezone" searchPlaceholder="Search city or region…" /></Field>
@@ -83,7 +94,7 @@ export default function SettingsPage() {
 
         <Card title={<span className="flex items-center gap-2"><MessageSquareText className="h-4 w-4" />IVR prompts</span>} className="lg:col-span-3">
           <fieldset disabled={!admin} className="grid gap-4 lg:grid-cols-2">
-            {(["known_caller", "recording_notice", "greeting", "reprompt", "after_hours", "connecting"] as const).map((k) => (
+            {(["known_caller", "recording_notice", "greeting", "reprompt", "sticky_offer", "connecting", "voicemail", "after_hours"] as const).map((k) => (
               <Field key={k} label={PROMPT_LABELS[k]} error={errors[`prompts.${k}`]} hint={PROMPT_HINTS[k]}>
                 <textarea className={cx("input min-h-28", errors[`prompts.${k}`] && "input-error")} maxLength={PROMPT_LIMITS[k]} value={cfg.prompts[k]} onChange={(e) => { setCfg({ ...cfg, prompts: { ...cfg.prompts, [k]: e.target.value } }); setErrors((x) => ({ ...x, [`prompts.${k}`]: "" })); }} />
                 <span className="mt-1 flex justify-end"><CharCount value={cfg.prompts[k]} max={PROMPT_LIMITS[k]} /></span>

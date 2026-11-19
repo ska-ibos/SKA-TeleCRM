@@ -16,26 +16,45 @@ export const DEPARTMENT_SEED: { key: number; name: string; kind: "crm" | "missed
 ];
 
 export interface OfficeHours { timezone: string; days: number[]; start: string; end: string }
-export interface Prompts { greeting: string; reprompt: string; after_hours: string; connecting: string; known_caller: string; recording_notice: string }
-/** Played while an agent who has an extension is rung. {name} and {extension} are filled in. */
-export const DEFAULT_CONNECTING_PROMPT = "Connecting you to {name}. To reach {name} directly next time, enter extension {extension} when you call.";
+export interface Prompts {
+  greeting: string; reprompt: string; after_hours: string; connecting: string;
+  known_caller: string; recording_notice: string; sticky_offer: string; voicemail: string;
+}
 
-export const DEFAULT_KNOWN_CALLER_PROMPT = "Namaste {name} ji.";
+/*
+ * Default IVR wording - Hinglish, as specified (SKA TeleCRM spec v1.1 §5). Every prompt is
+ * editable in Settings; values saved there win over these defaults.
+ */
+/** Played while an agent who has an extension is rung. {name} and {extension} are filled in. */
+export const DEFAULT_CONNECTING_PROMPT = "Aapko {name} se connect kiya ja raha hai. Agli baar seedha {name} se baat karne ke liye extension {extension} ke baad hash dabaiye.";
+/** Spoken first when the caller is a recognised client. {name} = client name. Empty = skipped. */
+export const DEFAULT_KNOWN_CALLER_PROMPT = "Namaste {name} ji!";
 /** Legal notice that the call is recorded (Exotel records live calls). Empty = not spoken. */
-export const DEFAULT_RECORDING_NOTICE = "This call may be recorded for quality and training purposes.";
+export const DEFAULT_RECORDING_NOTICE = "Yeh call record ki ja rahi hai.";
+/** Sticky sub-menu. {department} and {name} are filled in. */
+export const DEFAULT_STICKY_PROMPT = "{department} ke liye aapki pichhli baat {name} se hui thi. {name} se baat karne ke liye 1 dabaiye, nahi toh 2 dabaiye.";
+
+export type DeptMissBehavior = "crm" | "ring_department_group";
 
 export const DEFAULT_ROUTING_CONFIG = {
   sticky_days: 3,
   max_reprompts: 1,
   office_hours: { timezone: "Asia/Kolkata", days: [1, 2, 3, 4, 5, 6], start: "10:00", end: "19:00" } as OfficeHours,
+  /** No valid sticky for a department: "crm" (CRM desk routes and seeds the sticky) or ring the department's members. */
+  dept_miss_behavior: "crm" as DeptMissBehavior,
+  /** Key 2 only follows outbound calls this recent. 0 = no limit. */
+  missed_call_window_days: 0,
+  /** How many people ring at once for the CRM desk / a department group. 1 = one after another (Exotel parallel ringing is a paid add-on). */
+  parallel_ring_max: 1,
   prompts: {
     greeting:
-      "Welcome to Single Key Advisory. Enter the extension number, or press 1 for CRM desk, 2 if you missed our call, 3 for FA 360, 4 for Internal Audit, 5 for MIS, 6 for GST, 7 for Income Tax, 8 for Accounting, 9 for ROC.",
-    reprompt: "Sorry, we did not receive a valid input. Please try again.",
+      "Single Key Advisory mein aapka swagat hai. Jis team member se baat karni ho, unka extension pata ho toh extension ke baad hash dabaiye. Hamari CRM team ke liye 1 dabaiye. Missed call ke liye 2. FA 360 ke liye 3. Internal Audit ke liye 4. MIS ke liye 5. GST ke liye 6. Income Tax ke liye 7. Accounting ke liye 8. ROC ke liye 9.",
+    reprompt: "Maaf kijiye, humein sahi input nahi mila. Kripya dobara koshish karein.",
     after_hours:
-      "Thank you for calling Single Key Advisory. Our office hours are Monday to Saturday, 10 AM to 7 PM. Please leave a message after the tone and we will call you back.",
+      "Single Key Advisory ko call karne ke liye dhanyavaad. Hamara office Somvaar se Shanivaar, subah 10 se shaam 7 baje tak khula rehta hai. Beep ke baad apna sandesh chhodiye, hum aapko call karenge.",
+    voicemail: "Abhi hamari team vyast hai. Beep ke baad apna sandesh chhodiye, hum aapko jald hi call karenge.",
     connecting: DEFAULT_CONNECTING_PROMPT,
-    // spoken before the greeting on live calls; {name} = the caller's client name (known callers only)
+    sticky_offer: DEFAULT_STICKY_PROMPT,
     known_caller: DEFAULT_KNOWN_CALLER_PROMPT,
     recording_notice: DEFAULT_RECORDING_NOTICE,
   } as Prompts,

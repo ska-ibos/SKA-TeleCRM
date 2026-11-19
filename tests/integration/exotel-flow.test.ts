@@ -48,7 +48,7 @@ describe("Exotel call flow", () => {
     const s = t.sid();
     expect((await Flow.start(t.ctx(MON_11AM), t.q(s))).select).toBe("menu");
     const g = await Flow.gather(t.ctx(MON_11AM), t.q(s));
-    expect(g.gather_prompt.text).toMatch(/^Namaste Tapovan Impex ji\. This call may be recorded.*Welcome to Single Key Advisory/);
+    expect(g.gather_prompt.text).toMatch(/^Namaste Tapovan Impex ji! Yeh call record ki ja rahi hai\. Single Key Advisory mein aapka swagat hai/);
     expect(g).toMatchObject({ finish_on_key: "#", max_input_digits: 7 });
 
     expect((await Flow.input(t.ctx(MON_11AM), t.q(s, { digits: '"1"' }))).select).toBe("dial");
@@ -75,7 +75,7 @@ describe("Exotel call flow", () => {
     await Flow.start(t.ctx(at(MON_11AM, 24)), t.q(next));
     expect((await Flow.input(t.ctx(at(MON_11AM, 24)), t.q(next, { digits: '"6"' }))).select).toBe("sticky");
     const g = await Flow.gather(t.ctx(at(MON_11AM, 24)), t.q(next));
-    expect(g.gather_prompt.text).toContain("Hiren assisted you recently");
+    expect(g.gather_prompt.text).toBe("GST ke liye aapki pichhli baat Hiren se hui thi. Hiren se baat karne ke liye 1 dabaiye, nahi toh 2 dabaiye.");
     expect(g.max_input_digits).toBe(1);
     expect((await Flow.input(t.ctx(at(MON_11AM, 24)), t.q(next, { digits: '"1"' }))).select).toBe("dial");
     expect((await Flow.connect(t.ctx(at(MON_11AM, 24)), t.q(next))).destination.numbers).toEqual([PHONES.Hiren]);
@@ -96,7 +96,7 @@ describe("Exotel call flow", () => {
     // CRM desk busy too -> same number again, so Exotel stops and takes "nobody answered" -> Voicemail
     const c3 = await Flow.connect(t.ctx(MON_11AM), t.q(s, { DialCallStatus: "busy", DialWhomNumber: "09811100001" }));
     expect(c3.destination.numbers).toEqual([PHONES.Jinofer]);
-    expect(await Flow.prompt(t.ctx(MON_11AM), t.q(s))).toMatch(/leave a message/);
+    expect(await Flow.prompt(t.ctx(MON_11AM), t.q(s))).toMatch(/team vyast hai/);
 
     await Flow.voicemail(t.ctx(MON_11AM), t.q(s, { RecordingUrl: "https://recordings.exotel.com/vm1.mp3" }));
     const call = await t.callOf(s);
@@ -120,7 +120,7 @@ describe("Exotel call flow", () => {
     const s = t.sid();
     const sunday = new Date("2026-11-08T05:30:00Z");
     expect((await Flow.start(t.ctx(sunday), t.q(s))).select).toBe("voicemail");
-    expect(await Flow.prompt(t.ctx(sunday), t.q(s))).toMatch(/office hours/i);
+    expect(await Flow.prompt(t.ctx(sunday), t.q(s))).toMatch(/Somvaar se Shanivaar/);
   });
 
   it("duplicate or late callbacks replay instead of failing the call", async () => {
@@ -142,7 +142,7 @@ describe("Exotel call flow", () => {
     await Flow.start(t.ctx(MON_11AM), t.q(s));
     expect((await Flow.input(t.ctx(MON_11AM), t.q(s, { digits: '"0"' }))).select).toBe("menu");
     const g = await Flow.gather(t.ctx(MON_11AM), t.q(s));
-    expect(g.gather_prompt.text).toMatch(/^Sorry, we did not receive a valid input/);
+    expect(g.gather_prompt.text).toMatch(/^Maaf kijiye, humein sahi input nahi mila/);
     expect(g.gather_prompt.text).not.toContain("Namaste");
   });
 });

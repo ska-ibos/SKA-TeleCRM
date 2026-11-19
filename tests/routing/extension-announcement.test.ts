@@ -11,7 +11,7 @@ import type { Department, TeamMember } from "@/types";
 describe("connecting announcement", () => {
   it("fills name and extension, spelled out digit by digit", () => {
     expect(E.connectingPrompt(DEFAULT_CONNECTING_PROMPT, { full_name: "Prachi", extension: "13" }))
-      .toBe("Connecting you to Prachi. To reach Prachi directly next time, enter extension 1 3 when you call.");
+      .toBe("Aapko Prachi se connect kiya ja raha hai. Agli baar seedha Prachi se baat karne ke liye extension 1 3 ke baad hash dabaiye.");
   });
   it("says nothing for agents without an extension", () => {
     expect(E.connectingPrompt(DEFAULT_CONNECTING_PROMPT, { full_name: "Prachi", extension: null })).toBeUndefined();
@@ -32,7 +32,7 @@ describe("connecting announcement", () => {
     const t = await setup();
     await t.store.update("team_members", t.member("Komal").id, { extension: "205" });
     const s = await E.startInbound(t.ctx(MON_11AM), { from: t.phone });
-    expect((await E.handleInput(t.ctx(MON_11AM), s.callId, "205")).prompt).toContain("Connecting you to Komal");
+    expect((await E.handleInput(t.ctx(MON_11AM), s.callId, "205")).prompt).toContain("Aapko Komal se connect");
     const s2 = await E.startInbound(t.ctx(MON_11AM), { from: t.phone });
     const r2 = await E.handleInput(t.ctx(MON_11AM), s2.callId, "1"); // Jinofer has no extension here
     expect(r2.action).toBe("dial");

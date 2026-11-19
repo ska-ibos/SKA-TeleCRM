@@ -182,6 +182,13 @@ export interface ConnectResponse {
   recording_channels: "single" | "dual";
   max_ringing_duration: number;
   max_conversation_duration: number;
+  parallel_ringing?: { activate: boolean; max_parallel_attempts: number };
+}
+
+/** The members rung in this attempt (target first; more than one only with parallel ringing). */
+async function currentGroup(ctx: EngineCtx, callId: string): Promise<TeamMember[]> {
+  const cfg = await loadRoutingConfig(ctx.store);
+  return (await Engine.ringGroup(ctx, callId, cfg.parallel_ring_max)).filter((m) => m.phone);
 }
 
 /**
@@ -197,11 +204,14 @@ export async function connect(ctx: EngineCtx, p: ExotelParams): Promise<ConnectR
   const failure = p.DialCallStatus ? DIAL_FAILURES[p.DialCallStatus] : undefined;
   let session = await sessionOf(ctx, call.id);
   if (failure && session?.state === "dialing") {
-    await transition(ctx, call.id, () => Engine.handleDialResult(ctx, call.id, failure));
+    const rung = (await currentGroup(ctx, call.id)).map((m) => m.id); // everyone rung last time failed
+    await transition(ctx, call.id, () => Engine.handleDialResult(ctx, call.id, failure, { rung }));
     session = await sessionOf(ctx, call.id);
   }
   let numbers: string[] = [];
-  if (session?.state === "dialing" || session?.state === "connected") {
+  if (session?.state === "dialing") {
+    numbers = (await currentGroup(ctx, call.id)).map((m) => m.phone!);
+  } else if (session?.state === "connected") {
     const agent = session.target_agent_id ? await ctx.store.get<TeamMember>("team_members", session.target_agent_id) : null;
     if (agent?.phone) numbers = [agent.phone];
   } else if (p.DialWhomNumber) {
@@ -213,6 +223,7 @@ export async function connect(ctx: EngineCtx, p: ExotelParams): Promise<ConnectR
     destination: { numbers },
     record: true, recording_channels: "dual",
     max_ringing_duration: 30, max_conversation_duration: 3600,
+    ...(numbers.length > 1 && { parallel_ringing: { activate: true, max_parallel_attempts: numbers.length } }),
   };
 }
 
@@ -227,7 +238,10 @@ export async function end(ctx: EngineCtx, p: ExotelParams): Promise<{ select: Se
   if (session?.state === "dialing" && p.DialCallStatus === "completed") {
     const talk = talkSeconds(p);
     const answeredAt = new Date(Math.max(new Date(call.started_at).getTime(), ctx.now.getTime() - talk * 1000));
-    await transition(ctx, call.id, () => Engine.handleDialResult({ ...ctx, now: answeredAt }, call.id, "answered"));
+    // with parallel ringing, DialWhomNumber tells who actually picked up
+    const whom = normalizePhone(p.DialWhomNumber);
+    const answeredBy = whom ? (await currentGroup(ctx, call.id)).find((m) => m.phone === whom)?.id ?? null : null;
+    await transition(ctx, call.id, () => Engine.handleDialResult({ ...ctx, now: answeredAt }, call.id, "answered", { answeredBy }));
   }
   const step = await transition(ctx, call.id, () => Engine.hangup(ctx, call.id));
   await saveRecording(ctx, call.id, p.RecordingUrl, "call");

@@ -6,15 +6,17 @@ import type { Call, TeamMember } from "@/types";
  * e.g. Hiren calls Rahul -> Rahul calls back, presses 2 -> Hiren.
  */
 export async function findLatestOutboundAgent(
-  store: Store, p: { clientId: string | null; phone: string; now: Date; simulated: boolean },
+  store: Store, p: { clientId: string | null; phone: string; now: Date; simulated: boolean; windowDays?: number | null },
 ): Promise<{ agent: TeamMember; callId: string; at: string } | null> {
+  // missed_call_window_days: only outbound calls this recent count (null / 0 = no limit)
+  const gte = p.windowDays ? { started_at: new Date(p.now.getTime() - p.windowDays * 86_400_000).toISOString() } : undefined;
   const byPhone = await store.list<Call>("calls", {
-    eq: { direction: "outbound", to_number: p.phone, is_simulated: p.simulated }, notNull: ["initiated_by"],
+    eq: { direction: "outbound", to_number: p.phone, is_simulated: p.simulated }, notNull: ["initiated_by"], gte,
     lte: { started_at: p.now.toISOString() }, order: { column: "started_at", ascending: false }, limit: 1,
   });
   const byClient = p.clientId
     ? await store.list<Call>("calls", {
-        eq: { direction: "outbound", client_id: p.clientId, is_simulated: p.simulated }, notNull: ["initiated_by"],
+        eq: { direction: "outbound", client_id: p.clientId, is_simulated: p.simulated }, notNull: ["initiated_by"], gte,
         lte: { started_at: p.now.toISOString() }, order: { column: "started_at", ascending: false }, limit: 1,
       })
     : [];

@@ -1,11 +1,11 @@
 import type { Store } from "../data/types";
 import { AppError, badRequest, conflict, isConflict, isStaleWrite, notFound } from "../data/types";
-import type { Call, CallSession, CallTransfer, DialResult, RouteStep, SessionState, TeamMember } from "@/types";
+import type { Call, CallSession, CallTransfer, Department, DialResult, RouteStep, SessionState, TeamMember } from "@/types";
 import type { TelephonyProvider } from "../telephony/provider.interface";
 import { normalizePhone } from "../utils/phone";
 import { isWithinOfficeHours } from "../utils/date";
-import { DEFAULT_CONNECTING_PROMPT, OPERATIONS_LINE } from "../constants";
-import { getDepartmentByKey, isDepartmentMember, loadRoutingConfig } from "./department.service";
+import { DEFAULT_CONNECTING_PROMPT, DEFAULT_STICKY_PROMPT, OPERATIONS_LINE } from "../constants";
+import { getCrmDeskMembers, getDepartmentByKey, getDepartmentMemberIds, isDepartmentMember, loadRoutingConfig } from "./department.service";
 import { findAgentByExtension, looksLikeExtension } from "./extension.service";
 import { findStickyAgent } from "./sticky-agent.service";
 import { findLatestOutboundAgent } from "./missed-call.service";
@@ -67,11 +67,14 @@ export async function currentStep(ctx: EngineCtx, callId: string): Promise<Route
   const base = { callId, state: s.state, trail: s.context.trail ?? [], reason: l.call.route_reason ?? "", agent };
   switch (s.state) {
     case "greeting": return { ...base, action: "gather", prompt: cfg.prompts.greeting };
-    case "sticky_offer": return { ...base, action: "gather_sticky", prompt: stickyPrompt(target!.full_name) };
+    case "sticky_offer": {
+      const dept = l.call.department_id ? await ctx.store.get<Department>("departments", l.call.department_id) : null;
+      return { ...base, action: "gather_sticky", prompt: stickyPrompt(cfg.prompts.sticky_offer, target!.full_name, dept?.name ?? "") };
+    }
     // tell the caller the agent's extension while they are rung, so they can dial it next time
     case "dialing": return { ...base, action: "dial", prompt: connectingPrompt(cfg.prompts.connecting, target) };
     case "connected": return { ...base, action: "connected" };
-    case "voicemail": return { ...base, action: "voicemail", prompt: l.call.after_hours ? cfg.prompts.after_hours : "All our team members are busy. Please leave a message after the tone and we will call you back." };
+    case "voicemail": return { ...base, action: "voicemail", prompt: l.call.after_hours ? cfg.prompts.after_hours : cfg.prompts.voicemail };
     default: return { ...base, action: "hangup" };
   }
 }
@@ -83,8 +86,9 @@ export function connectingPrompt(template: string | undefined, agent: Pick<TeamM
   return (template || DEFAULT_CONNECTING_PROMPT).replaceAll("{name}", agent.full_name).replaceAll("{extension}", spoken);
 }
 
-const stickyPrompt = (name: string) =>
-  `${name} assisted you recently. Press 1 to connect to ${name}, or press 2 for the CRM desk.`;
+/** "GST ke liye aapki pichhli baat Hiren se hui thi…". {name} and {department} are filled in. */
+export const stickyPrompt = (template: string | undefined, name: string, department: string) =>
+  (template || DEFAULT_STICKY_PROMPT).replaceAll("{name}", name).replaceAll("{department}", department).replace(/\s+/g, " ").trim();
 
 /* ------------------------------------------------------------------ */
 
@@ -169,7 +173,10 @@ export async function handleInput(ctx: EngineCtx, callId: string, rawDigits: str
     if (dept.kind === "crm") return routeToCrm(ctx, l, "Key 1 -> CRM desk");
 
     if (dept.kind === "missed_call") {
-      const hit = await findLatestOutboundAgent(ctx.store, { clientId: l.call.client_id, phone: l.call.from_number, now: ctx.now, simulated: l.call.is_simulated });
+      const hit = await findLatestOutboundAgent(ctx.store, {
+        clientId: l.call.client_id, phone: l.call.from_number, now: ctx.now, simulated: l.call.is_simulated,
+        windowDays: cfg.missed_call_window_days,
+      });
       if (!hit) return routeToCrm(ctx, l, "Key 2 -> no outbound history, CRM desk");
       return dial(ctx, l, hit.agent, `Key 2 -> latest outbound agent ${hit.agent.full_name}`, "crm");
     }
@@ -178,7 +185,12 @@ export async function handleInput(ctx: EngineCtx, callId: string, rawDigits: str
       clientId: l.call.client_id, phone: l.call.from_number, departmentId: dept.id,
       now: ctx.now, stickyDays: cfg.sticky_days, excludeCallId: l.call.id, simulated: l.call.is_simulated,
     });
-    if (!sticky) return routeToCrm(ctx, l, `Key ${key} (${dept.name}) -> no valid sticky agent, CRM desk`);
+    if (!sticky) {
+      if (cfg.dept_miss_behavior === "ring_department_group") {
+        return ringDepartment(ctx, l, dept.id, `Key ${key} (${dept.name}) -> no valid sticky agent, ringing ${dept.name} team`, []);
+      }
+      return routeToCrm(ctx, l, `Key ${key} (${dept.name}) -> no valid sticky agent, CRM desk`);
+    }
     await save(ctx, l, { route_reason: `Key ${key} (${dept.name}) -> sticky ${sticky.agent.full_name}` },
       { state: "sticky_offer", offered_agent_id: sticky.agent.id },
       `Sticky ${sticky.agent.full_name} valid until ${sticky.expiresAt}`);
@@ -209,24 +221,71 @@ export async function handleStickyChoice(ctx: EngineCtx, callId: string, digit: 
 /** Live telephony rings the agent's mobile: without a number the agent cannot be reached. */
 const unreachable = (ctx: EngineCtx, agent: TeamMember) => !ctx.provider.isSimulation && !agent.phone;
 
-async function dial(ctx: EngineCtx, l: Loaded, agent: TeamMember, reason: string, fallback: "crm" | "voicemail"): Promise<RouteStep> {
+/**
+ * Who is rung next when a ring fails. Every failed or unreachable agent is added to `tried`:
+ *  - a single agent (extension, sticky, key 2) -> CRM desk members, one after another;
+ *  - a department group (dept_miss_behavior = ring_department_group) -> the next free member
+ *    of that department, then the CRM desk;
+ *  - the CRM desk -> the next free desk member, then voicemail.
+ */
+interface DialPlan { fallback: "crm" | "voicemail"; pool?: "crm" | "department"; poolDept?: string | null; tried?: string[] }
+
+async function dial(ctx: EngineCtx, l: Loaded, agent: TeamMember, reason: string, plan: DialPlan | "crm" | "voicemail"): Promise<RouteStep> {
+  const p: DialPlan = typeof plan === "string" ? { fallback: plan } : plan;
+  const tried = p.tried ?? [];
   if (!agent.is_active || agent.status !== "available" || unreachable(ctx, agent)) {
     const why = !agent.is_active ? `${agent.full_name} is inactive`
       : agent.status !== "available" ? `${agent.full_name} is ${agent.status}` : `${agent.full_name} has no phone number in TeleCRM`;
-    if (fallback === "crm") return routeToCrm(ctx, l, `${reason}; ${why} -> CRM desk`, [agent.id]);
-    return toVoicemail(ctx, l, `${reason}; ${why}`);
+    return nextAfter(ctx, l, { ...p, tried: [...tried, agent.id] }, `${reason}; ${why}`);
   }
   await ctx.provider.dialAgent({ callId: l.call.id, agent, reason });
   await save(ctx, l, { routed_agent_id: agent.id, status: "connecting", route_reason: reason },
-    { state: "dialing", target_agent_id: agent.id, context: { fallback } },
+    { state: "dialing", target_agent_id: agent.id, context: { fallback: p.fallback, pool: p.pool, poolDept: p.poolDept ?? null, tried } },
     `${reason} (ringing${agent.extension ? `; caller told extension ${agent.extension}` : ""})`);
   return currentStep(ctx, l.call.id);
+}
+
+/** Continue the chain after `plan.tried` failed: same department group first, else the CRM desk. */
+async function nextAfter(ctx: EngineCtx, l: Loaded, plan: DialPlan, why: string): Promise<RouteStep> {
+  if (plan.pool === "department" && plan.poolDept) return ringDepartment(ctx, l, plan.poolDept, why, plan.tried ?? []);
+  return routeToCrm(ctx, l, why.includes("CRM") ? why : `${why} -> CRM desk`, plan.tried ?? []);
+}
+
+/** Free members of a department (active, available, reachable), in a stable order. */
+export async function departmentPool(ctx: EngineCtx, departmentId: string, exclude: string[] = []): Promise<TeamMember[]> {
+  const ids = new Set(await getDepartmentMemberIds(ctx.store, departmentId));
+  return (await ctx.store.list<TeamMember>("team_members", { eq: { is_active: true }, order: { column: "full_name" } }))
+    .filter((m) => ids.has(m.id) && !exclude.includes(m.id) && m.status === "available" && !unreachable(ctx, m));
+}
+
+async function ringDepartment(ctx: EngineCtx, l: Loaded, departmentId: string, reason: string, tried: string[]): Promise<RouteStep> {
+  const [next] = await departmentPool(ctx, departmentId, tried);
+  if (!next) return routeToCrm(ctx, l, `${reason}; no free department member -> CRM desk`, tried);
+  return dial(ctx, l, next, reason, { fallback: "crm", pool: "department", poolDept: departmentId, tried });
 }
 
 async function routeToCrm(ctx: EngineCtx, l: Loaded, reason: string, exclude: string[] = []): Promise<RouteStep> {
   const desk = await pickCrmDesk(ctx.store, exclude, { requirePhone: !ctx.provider.isSimulation });
   if (!desk) return toVoicemail(ctx, l, `${reason}; CRM desk unavailable`);
-  return dial(ctx, l, desk, reason.includes("CRM") ? reason : `${reason} -> CRM desk`, "voicemail");
+  return dial(ctx, l, desk, reason.includes("CRM") ? reason : `${reason} -> CRM desk`, { fallback: "voicemail", pool: "crm", tried: exclude });
+}
+
+/**
+ * Everyone who may ring at once for the current attempt (parallel ringing): the target first,
+ * then other free members of the same pool (CRM desk or department group), up to `max`.
+ * A single agent (extension / sticky / key 2) is always rung alone.
+ */
+export async function ringGroup(ctx: EngineCtx, callId: string, max: number): Promise<TeamMember[]> {
+  const l = await load(ctx, callId);
+  const target = await agentOf(ctx, l.session.target_agent_id);
+  if (!target || l.session.state !== "dialing") return [];
+  const c = l.session.context;
+  if (max <= 1 || !c.pool) return [target];
+  const exclude = [...(c.tried ?? []), target.id];
+  const others = c.pool === "department" && c.poolDept
+    ? await departmentPool(ctx, c.poolDept, exclude)
+    : (await getCrmDeskMembers(ctx.store)).filter((m) => !exclude.includes(m.id) && m.status === "available" && !unreachable(ctx, m));
+  return [target, ...others].slice(0, max);
 }
 
 async function toVoicemail(ctx: EngineCtx, l: Loaded, reason: string): Promise<RouteStep> {
@@ -237,19 +296,27 @@ async function toVoicemail(ctx: EngineCtx, l: Loaded, reason: string): Promise<R
   return currentStep(ctx, l.call.id);
 }
 
-export async function handleDialResult(ctx: EngineCtx, callId: string, result: DialResult): Promise<RouteStep> {
+/**
+ * Outcome of a ring. `opts.answeredBy`: with parallel ringing, the member who actually picked up
+ * (any member of the rung group). `opts.rung`: everyone rung in this attempt, so none of them is
+ * tried again on failure.
+ */
+export async function handleDialResult(ctx: EngineCtx, callId: string, result: DialResult, opts: { answeredBy?: string | null; rung?: string[] } = {}): Promise<RouteStep> {
   const l = await load(ctx, callId);
   expect(l.session, "dialing");
-  const agent = await agentOf(ctx, l.session.target_agent_id);
-  if (!agent) throw notFound("Target agent");
+  const target = await agentOf(ctx, l.session.target_agent_id);
+  if (!target) throw notFound("Target agent");
   if (result === "answered") {
-    await save(ctx, l, { status: "answered", answered_agent_id: agent.id, answered_at: ctx.now.toISOString() },
-      { state: "connected" }, `${agent.full_name} answered`);
+    const picked = opts.answeredBy && opts.answeredBy !== target.id ? await agentOf(ctx, opts.answeredBy) : null;
+    const agent = picked ?? target;
+    await save(ctx, l, { status: "answered", answered_agent_id: agent.id, routed_agent_id: agent.id, answered_at: ctx.now.toISOString() },
+      { state: "connected", target_agent_id: agent.id }, `${agent.full_name} answered`);
     return currentStep(ctx, callId);
   }
-  const why = `${agent.full_name}: ${result.replace("_", " ")}`;
-  if (l.session.context.fallback === "crm") return routeToCrm(ctx, l, `${why} -> CRM desk`, [agent.id]);
-  return toVoicemail(ctx, l, why);
+  const c = l.session.context;
+  const tried = [...new Set([...(c.tried ?? []), target.id, ...(opts.rung ?? [])])];
+  const names = opts.rung && opts.rung.length > 1 ? `${opts.rung.length} agents` : target.full_name;
+  return nextAfter(ctx, l, { fallback: c.fallback ?? "crm", pool: c.pool, poolDept: c.poolDept, tried }, `${names}: ${result.replace("_", " ")}`);
 }
 
 export async function leaveVoicemail(ctx: EngineCtx, callId: string, message?: string | null): Promise<RouteStep> {
