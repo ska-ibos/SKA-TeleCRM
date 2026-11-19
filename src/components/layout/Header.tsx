@@ -1,13 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronRight, LogOut, Menu } from "lucide-react";
+import { Bell, ChevronRight, LogOut, Menu } from "lucide-react";
 import { Avatar, Badge, Button, StatusDot, cx, useToast } from "../common/ui";
 import { NAV } from "./Sidebar";
 import { useUser } from "./UserContext";
-import { apiFetch } from "@/hooks/useApi";
+import { apiFetch, useApi } from "@/hooks/useApi";
 import { ROLE_LABELS } from "@/lib/constants";
-import type { AgentStatus } from "@/types";
+import type { AgentStatus, Reminder, TeamMember } from "@/types";
 
 const STATUSES: { value: AgentStatus; label: string }[] = [
   { value: "available", label: "Available" }, { value: "busy", label: "Busy" }, { value: "offline", label: "Offline" },
@@ -19,6 +20,15 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const path = usePathname();
   const toast = useToast();
   const [status, setStatus] = useState<AgentStatus | "">("");
+  // current availability, so the toggle shows the real state after a reload
+  const team = useApi<TeamMember[]>(user.memberId ? "/api/team" : null);
+  const myStatus = team.data?.find((m) => m.id === user.memberId)?.status;
+  useEffect(() => { if (myStatus) setStatus((s) => s || myStatus); }, [myStatus]);
+  // in-app reminder notification (spec §8.5): my pending reminders that are due
+  const reminders = useApi<Reminder[]>(user.memberId ? "/api/reminders?status=pending&mine=1" : null, 60_000);
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => { setNow(Date.now()); const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
+  const due = now ? (reminders.data ?? []).filter((r) => new Date(r.due_at).getTime() <= now).length : 0;
   const page = NAV.find((n) => path === n.href || path.startsWith(`${n.href}/`));
 
   async function changeStatus(s: AgentStatus) {
@@ -58,6 +68,13 @@ export function Header({ onMenu }: { onMenu: () => void }) {
               </button>
             ))}
           </div>
+        )}
+        {user.memberId && (
+          <Link href="/reminders" aria-label={due ? `${due} reminders due` : "Reminders"} title={due ? `${due} reminder${due === 1 ? "" : "s"} due` : "No reminders due"}
+            className="relative rounded-lg p-2 text-slate-600 transition hover:bg-slate-200/60">
+            <Bell className={cx("h-5 w-5", due > 0 && "animate-ring text-rose-600")} />
+            {due > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">{due > 99 ? "99+" : due}</span>}
+          </Link>
         )}
         <div className="flex items-center gap-2.5">
           <Avatar name={user.name} size="sm" />

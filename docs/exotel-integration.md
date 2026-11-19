@@ -127,10 +127,22 @@ agent on the call, the CRM desk, a manager or an admin can record it.
 7. Call outside office hours → after-hours message + voicemail.
 8. In Supabase, check `tc_provider_events` for any `rejected` / `failed` rows (every Exotel request is logged there with its outcome).
 
-## 7. Not covered yet
+## 7. Maintenance job (`vercel.json` cron → `/api/cron/maintenance`)
 
-- **Caller hangs up during the menu**: Exotel sends nothing; such calls are closed by the
-  `tc-close-stale-calls` job after 6 h. A follow-up can read Exotel's Call Details API instead.
-- **Recordings** are stored as Exotel links (kept ~6 months by Exotel). Copying them to
-  Supabase Storage is a follow-up.
+Needs `CRON_SECRET` (Vercel sends it as `Authorization: Bearer …`). Each run:
+- **Callers who hang up during the menu** — Exotel calls none of our URLs, so the job asks
+  Exotel's Call Details API about inbound calls still open after 15 min and closes them
+  (missed + callback reminder, or completed if they were connected), saving the recording link.
+  The database job `tc-close-stale-calls` still closes anything left after 6 h.
+- **Recordings** — copies Exotel recordings into the private `telecrm-recordings` bucket
+  (Exotel keeps them ~6 months). Playback (`/api/recordings`) uses the copy once it exists,
+  otherwise streams Exotel's file through the server; URLs never reach the browser.
+
+`vercel.json` schedules it daily (Vercel's free plan allows one run a day). On a Pro plan set
+`"schedule": "*/15 * * * *"`.
+
+## 8. Not covered yet
+
+- **WhatsApp reminders (SendBuddy)** — needs SendBuddy's API details. Reminders are shown
+  in-app (bell in the header, Reminders page) until then.
 - **Sales line** (second ExoPhone) — Phase 4 of the spec.

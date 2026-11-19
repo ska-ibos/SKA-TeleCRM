@@ -215,7 +215,8 @@ export async function handleStickyChoice(ctx: EngineCtx, callId: string, digit: 
   expect(l.session, "sticky_offer");
   const offered = await agentOf(ctx, l.session.offered_agent_id);
   if (digit === "1" && offered) return dial(ctx, l, offered, `Caller accepted sticky agent ${offered.full_name}`, "crm");
-  return routeToCrm(ctx, l, digit === "2" ? "Caller chose CRM desk" : "Invalid sticky choice -> CRM desk");
+  const name = offered?.full_name ?? "agent";
+  return routeToCrm(ctx, l, digit === "2" ? `Caller declined sticky ${name}, chose CRM desk` : `Invalid sticky choice (offered ${name}) -> CRM desk`);
 }
 
 /** Live telephony rings the agent's mobile: without a number the agent cannot be reached. */

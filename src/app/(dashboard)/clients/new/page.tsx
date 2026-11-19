@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PhoneCall, Star, UserSearch } from "lucide-react";
 import { Card, ErrorBox, PageHeader, useToast } from "@/components/common/ui";
@@ -15,6 +16,9 @@ export default function NewClientPage() {
   const router = useRouter();
   const toast = useToast();
   const { can, user } = useUser();
+  // ?phone= from an unknown caller's call page (read after mount: no search params on the server render)
+  const [phone, setPhone] = useState<string | null>(null);
+  useEffect(() => setPhone(new URLSearchParams(window.location.search).get("phone")?.slice(0, 20) ?? ""), []);
   if (!can("clients:write")) return <ErrorBox message="You do not have permission to create clients." />;
   if (user.clientsManagedExternally) return <ErrorBox message="Clients are managed in SKA OS. Create the client there - TeleCRM picks it up automatically, including its mobile number and contacts for caller identification." />;
   return (
@@ -22,7 +26,7 @@ export default function NewClientPage() {
       <PageHeader title="New client" subtitle="Add a client and their phone numbers for caller identification" />
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <ClientForm onCancel={() => router.back()} onSaved={(c) => { toast.success(`Client "${c.name}" created`); router.push(`/clients/${c.id}`); }} />
+          {phone !== null && <ClientForm key={phone} defaultPhone={phone} onCancel={() => router.back()} onSaved={(c) => { toast.success(`Client "${c.name}" created`); router.push(`/clients/${c.id}`); }} />}
         </Card>
         <Card title="Why phone numbers matter">
           <ul className="stagger space-y-4">

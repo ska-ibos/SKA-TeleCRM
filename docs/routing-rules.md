@@ -23,7 +23,13 @@ Latest `calls` row with `direction = outbound` to the caller's number (or the ca
 `team_members.status`: `available` is dialled; `busy` / `offline` skip straight to the fallback. Dial outcomes `busy` / `no_answer` / `failed` also fall back. On live calls an agent without a mobile number in TeleCRM is also skipped.
 
 ## Fallback chain
-target agent → CRM desk (first *available* member of key-1 department or `is_crm_desk`) → voicemail + callback reminder.
+target agent → CRM desk members one after another (key-1 department or `is_crm_desk`, *available*, never the same person twice) → voicemail + callback reminder.
+
+With `dept_miss_behavior = ring_department_group`, a department key without a valid sticky rings the department's free members one by one, then the CRM desk. An answered call seeds the sticky as usual.
+
+`parallel_ring_max` > 1 rings the whole CRM desk / department group at once on Exotel (`parallel_ringing`; a paid Exotel add-on). The member who picks up is recorded from `DialWhomNumber`.
+
+`missed_call_window_days` > 0 limits key 2 to outbound calls that recent.
 
 ## Invalid input
 `max_reprompts` (default 1) re-prompts, then CRM desk.

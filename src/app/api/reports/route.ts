@@ -4,11 +4,12 @@ import { buildReport } from "@/lib/services/report.service";
 import { toCsv } from "@/lib/utils/csv";
 import { dateRangeSchema } from "@/lib/validations";
 import { getProvider } from "@/lib/telephony/provider.factory";
+import { scopeFor } from "@/lib/services/access.service";
 
 export const GET = api(async (req) => {
-  const { store } = await apiCtx("reports:read");
+  const { store, user } = await apiCtx("reports:read");
   const r = await buildReport(store, dateRangeSchema.parse({ from: param(req, "from"), to: param(req, "to") }),
-    { excludeSimulated: !getProvider().isSimulation });
+    { excludeSimulated: !getProvider().isSimulation, scope: await scopeFor(store, user) });
   const format = param(req, "format");
   if (format) {
     const key = format === "agents" ? "byAgent" : format === "departments" ? "byDepartment" : null;

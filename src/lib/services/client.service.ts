@@ -4,6 +4,7 @@ import type { Call, Client, ClientPhone, ClientTag, Department, Note, Reminder, 
 import type { z } from "zod";
 import type { clientCreateSchema, clientSchema, phoneCreateSchema } from "../validations";
 import { audit } from "./audit.service";
+import { canSeeClient, type Scope } from "./access.service";
 
 /**
  * Caller identification. A number shared by several clients (common for group companies
@@ -29,11 +30,12 @@ function assertClientsWritable(store: Store) {
 }
 const isLocal = (p: ClientPhone) => (p.source ?? "telecrm") === "telecrm";
 
-export async function listClients(store: Store, f: { q?: string; status?: string; tagId?: string } = {}) {
+export async function listClients(store: Store, f: { q?: string; status?: string; tagId?: string } = {}, scope: Scope = { all: true }) {
   let clients = await store.list<Client>("clients", {
     eq: f.status ? { status: f.status } : undefined,
     order: { column: "created_at", ascending: false }, limit: 5000,
   });
+  if (!scope.all) clients = clients.filter((c) => canSeeClient(scope, c.id));
   const [phones, ctags, tags] = await Promise.all([
     store.list<ClientPhone>("client_phone_numbers"), store.list<ClientTag>("client_tags"), store.list<Tag>("tags"),
   ]);
@@ -51,8 +53,8 @@ export async function listClients(store: Store, f: { q?: string; status?: string
   }));
 }
 
-export async function getClientDetail(store: Store, id: string) {
-  const client = await store.get<Client>("clients", id);
+export async function getClientDetail(store: Store, id: string, scope: Scope = { all: true }) {
+  const client = canSeeClient(scope, id) ? await store.get<Client>("clients", id) : null;
   if (!client) throw notFound("Client");
   const [phones, ctags, tags, notes, reminders, calls, team, depts] = await Promise.all([
     store.list<ClientPhone>("client_phone_numbers", { eq: { client_id: id } }),
@@ -178,4 +180,28 @@ export async function removePhone(store: Store, phoneId: string, actorId: string
   const next = all.find((x) => x.id !== phoneId && isLocal(x));
   if (p.is_primary && next) await store.update("client_phone_numbers", next.id, { is_primary: true });
   await audit(store, actorId, "remove_phone", "client", p.client_id, { phone: p.phone });
+}
+
+/**
+ * Unknown caller (or a number shared by several clients) -> link it to a client from the call
+ * page (spec §12 "client calls from a new number"). Registers the number in TeleCRM for that
+ * client (pins caller ID from now on) and attaches this call, and earlier unlinked calls from
+ * the same number, so their history and stickies count for the client.
+ */
+export async function linkCallToClient(store: Store, callId: string, clientId: string, actorId: string | null) {
+  const call = await store.get<Call>("calls", callId);
+  if (!call) throw notFound("Call");
+  if (!(await store.get<Client>("clients", clientId))) throw notFound("Client");
+  const phone = call.direction === "inbound" ? call.from_number : call.to_number;
+  if (!/^\+[1-9]\d{7,14}$/.test(phone)) throw conflict("This call has no phone number to link");
+  const mine = (await store.list<ClientPhone>("client_phone_numbers", { eq: { client_id: clientId, phone } })).some(isLocal);
+  if (!mine) await addPhone(store, { client_id: clientId, phone, label: "mobile", is_primary: false }, actorId);
+  const unlinked = (await store.list<Call>("calls", { eq: { from_number: phone }, limit: 500 }))
+    .concat(await store.list<Call>("calls", { eq: { to_number: phone }, limit: 500 }))
+    .filter((c) => !c.client_id || c.id === callId);
+  for (const c of new Map(unlinked.map((x) => [x.id, x])).values()) {
+    await store.update("calls", c.id, { client_id: clientId });
+  }
+  await audit(store, actorId, "link_caller", "call", callId, { client_id: clientId, phone, calls: unlinked.length });
+  return { client_id: clientId, phone, calls: unlinked.length };
 }

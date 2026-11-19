@@ -11,6 +11,9 @@ import type { getCallDetail } from "@/lib/services/call.service";
 import type { Department, DialResult, TeamMember } from "@/types";
 import { CharCount, Select, type Option } from "../common/form";
 import { agentChoices, deptChoices, membersOf, pickAgent, pickDept } from "@/lib/utils/agent-dept";
+import { CallerContext } from "./CallerContext";
+import { LinkClient } from "./LinkClient";
+import { useUser } from "../layout/UserContext";
 
 type MemberRow = TeamMember & { departments?: { id: string; name: string; ivr_key: number }[] };
 
@@ -20,6 +23,7 @@ type Detail = Awaited<ReturnType<typeof getCallDetail>>;
 
 export function CallDetails({ d, reload }: { d: Detail; reload: () => void }) {
   const toast = useToast();
+  const { can } = useUser();
   const c = d.call;
   const team = useApi<MemberRow[]>("/api/team");
   const depts = useApi<Department[]>("/api/departments");
@@ -76,6 +80,24 @@ export function CallDetails({ d, reload }: { d: Detail; reload: () => void }) {
       </Card>
 
       <div className="space-y-6 lg:col-span-2">
+        <Card title={c.client_name ? `${c.client_name} — history & who to transfer to` : "Caller history"}>
+          {!c.client_id && can("clients:write") && <LinkClient callId={c.id} phone={c.direction === "inbound" ? c.from_number : c.to_number} onLinked={reload} />}
+          <CallerContext key={`${c.id}-${c.client_id ?? ""}`} callId={c.id} />
+        </Card>
+
+        {d.recordings.length > 0 && (
+          <Card title="Recordings">
+            <ul className="space-y-3">
+              {d.recordings.map((r) => (
+                <li key={r.id} className="space-y-1">
+                  <p className="text-xs text-slate-500">{r.kind === "voicemail" ? "Voicemail" : "Call recording"} · {fmtDateTime(r.created_at)}{r.archived ? " · archived" : ""}</p>
+                  <audio controls preload="none" className="w-full" src={`/api/recordings?id=${r.id}`} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
         <Card title="Routing trail">
           <p className="mb-4 rounded-xl bg-brand-50/70 px-3.5 py-2.5 text-sm font-medium text-brand-800">{c.route_reason ?? "—"}</p>
           <Trail items={d.session?.context.trail ?? []} />

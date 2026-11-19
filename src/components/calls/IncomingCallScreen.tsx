@@ -6,6 +6,7 @@ import { useLiveCalls } from "@/hooks/useLiveCalls";
 import { useUser } from "../layout/UserContext";
 import { formatPhone } from "@/lib/utils/phone";
 import { Avatar, Badge } from "../common/ui";
+import { CallerContext } from "./CallerContext";
 
 /** Screen-pop: shows the caller's CRM record when a call is ringing for the signed-in agent. */
 export function IncomingCallScreen() {
@@ -16,7 +17,7 @@ export function IncomingCallScreen() {
   if (!user.memberId || !ringing.length) return null;
   const c = ringing[0];
   return (
-    <div className="slide-in-right fixed left-4 right-4 top-20 z-50 overflow-hidden rounded-2xl bg-white shadow-pop ring-1 ring-brand-200 sm:left-auto sm:w-80">
+    <div className="slide-in-right fixed left-4 right-4 top-20 z-50 overflow-hidden rounded-2xl bg-white shadow-pop ring-1 ring-brand-200 sm:left-auto sm:w-96">
       <div className="relative flex items-center justify-between overflow-hidden bg-brand-900 px-4 py-3 text-white">
         <span className="flex items-center gap-3 text-sm font-semibold">
           <span className="relative grid h-7 w-7 place-items-center rounded-full bg-brass-300 text-brand-950">
@@ -40,6 +41,7 @@ export function IncomingCallScreen() {
           {c.is_simulated && <Badge tone="amber">Simulation</Badge>}
         </div>
         <p className="text-xs text-slate-500">{c.route_reason}</p>
+        <div className="max-h-64 overflow-y-auto border-t border-slate-100 pt-3"><CallerContext key={c.id} callId={c.id} compact /></div>
         <div className="flex gap-3 border-t border-slate-100 pt-3 text-sm">
           {c.client_id && <Link className="link" href={`/clients/${c.client_id}`}>Open client</Link>}
           <Link className="link" href={`/calls/${c.id}`}>Call details</Link>

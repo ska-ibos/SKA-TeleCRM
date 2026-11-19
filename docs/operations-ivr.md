@@ -2,7 +2,11 @@
 
 Scope: **Operations line only.** No Sales number, IVR, queue or workflow exists in this project.
 
-## Greeting (editable in Settings)
+## Prompts (editable in Settings)
+
+The defaults are the spec's Hinglish wording (greeting, sticky offer "GST ke liye aapki pichhli baat Hiren se hui thi…", connecting, voicemail, after hours). The live database keeps the prompts saved there, so update them in **Settings → IVR prompts** to switch an existing setup to Hinglish.
+
+## Greeting
 
 On live calls the greeting is preceded by **"Namaste {name} ji."** for recognised clients and the **recording notice** (both editable in Settings; leave empty to skip).
 

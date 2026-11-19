@@ -19,9 +19,10 @@ const CLEAN: Partial<Record<string, (v: string) => string>> = {
   email: (v) => v.replace(/\s/g, ""),
 };
 
-export function ClientForm({ initial, onSaved, onCancel }: { initial?: Client; onSaved: (c: Client) => void; onCancel?: () => void }) {
+/** `defaultPhone`: prefilled first number (e.g. "create a client for this caller" from a call page). */
+export function ClientForm({ initial, onSaved, onCancel, defaultPhone }: { initial?: Client; onSaved: (c: Client) => void; onCancel?: () => void; defaultPhone?: string }) {
   const [v, setV] = useState<Record<string, string>>(initial ? Object.fromEntries(Object.entries(empty).map(([k]) => [k, String(initial[k as keyof Client] ?? "")])) : empty);
-  const [phones, setPhones] = useState<Phone[]>([{ phone: "", label: "mobile" }]);
+  const [phones, setPhones] = useState<Phone[]>([{ phone: defaultPhone ?? "", label: "mobile" }]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
